@@ -42,7 +42,8 @@ returns (status_: Status, ret_: Store)
   var justified_checkpoint: Checkpoint := Checkpoint(anchor_epoch, anchor_root);
   var finalized_checkpoint: Checkpoint := Checkpoint(anchor_epoch, anchor_root);
   var proposer_boost_root: Root := Root_new(0);
-  return Success, Store_new(uint64_new(anchor_state.genesis_time + (SECONDS_PER_SLOT * anchor_state.slot)), anchor_state.genesis_time, justified_checkpoint, finalized_checkpoint, justified_checkpoint, proposer_boost_root, Set_new([]), Dict_new([(anchor_root, anchor_block.copy())]), Dict_new([(anchor_root, anchor_state.copy())]), Dict_new([(justified_checkpoint, anchor_state.copy())]), Dict_new([]));
+  var tmp_0 := new Store.Init(uint64_new(anchor_state.genesis_time + (SECONDS_PER_SLOT * anchor_state.slot)), anchor_state.genesis_time, justified_checkpoint, finalized_checkpoint, justified_checkpoint, proposer_boost_root, Set_new([]), Dict_new([(anchor_root, anchor_block.copy())]), Dict_new([(anchor_root, anchor_state.copy())]), Dict_new([(justified_checkpoint, anchor_state.copy())]), Dict_new([]));
+  return Success, tmp_0;
 }
 
 function method get_slots_since_genesis(store: Store): int

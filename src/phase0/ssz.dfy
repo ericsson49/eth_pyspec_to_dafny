@@ -93,7 +93,7 @@ module SSZ {
     type Bitvector = ssz_Vector<boolean>
 
     function method hash(a: nat): Bytes32
-    function method hash_tree_root(a: object): Bytes32
+    function method hash_tree_root<T>(a: T): Bytes32
 
     function method iter<T>(a: Collection<T>): Iterator<T>
     function method has_next<T>(a: Iterator<T>): bool {

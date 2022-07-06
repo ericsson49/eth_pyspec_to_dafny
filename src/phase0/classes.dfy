@@ -5,26 +5,28 @@ module Classes {
     import opened SSZ
     import opened SimpleTypes
 
-    class Fork {
-    constructor() {
-        previous_version := Version_default;
-        current_version := Version_default;
-        epoch := Epoch_default;
+    datatype Fork = Fork(
+        previous_version: Version,
+        current_version: Version,
+        epoch: Epoch
+    )
+    function method Fork_new(): Fork {
+        Fork(Version_default, Version_default, Epoch_default)
     }
-    var previous_version: Version;
-    var current_version: Version;
-    var epoch: Epoch;
+    datatype ForkData = ForkData(
+        current_version: Version,
+        genesis_validators_root: Root
+    )
+    function method ForkData_new(): ForkData {
+        ForkData(Version_default, Root_default)
     }
-    class ForkData {
-    constructor() {
-        current_version := Version_default;
-        genesis_validators_root := Root_default;
+    datatype Checkpoint = Checkpoint(
+        epoch: Epoch,
+        root: Root
+    )
+    function method Checkpoint_new(): Checkpoint {
+        Checkpoint(Epoch_default, Root_default)
     }
-    var current_version: Version;
-    var genesis_validators_root: Root;
-    }
-    datatype Checkpoint = Checkpoint(epoch: Epoch, root: Root)
-    function method Checkpoint_new(): Checkpoint { Checkpoint(Epoch_default, Root_default) }
     class Validator {
     constructor() {
         pubkey := BLSPubkey_default;
@@ -36,8 +38,8 @@ module Classes {
         exit_epoch := Epoch_default;
         withdrawable_epoch := Epoch_default;
     }
-    var pubkey: BLSPubkey;
-    var withdrawal_credentials: Bytes32;
+    const pubkey: BLSPubkey;
+    const withdrawal_credentials: Bytes32;
     var effective_balance: Gwei;
     var slashed: boolean;
     var activation_eligibility_epoch: Epoch;
@@ -45,192 +47,155 @@ module Classes {
     var exit_epoch: Epoch;
     var withdrawable_epoch: Epoch;
     }
-    class AttestationData {
-    constructor() {
-        slot := Slot_default;
-        index := CommitteeIndex_default;
-        beacon_block_root := Root_default;
-        source := Checkpoint_new();
-        target := Checkpoint_new();
+    datatype AttestationData = AttestationData(
+        slot: Slot,
+        index: CommitteeIndex,
+        beacon_block_root: Root,
+        source: Checkpoint,
+        target: Checkpoint
+    )
+    function method AttestationData_new(): AttestationData {
+        AttestationData(Slot_default, CommitteeIndex_default, Root_default, Checkpoint_new(), Checkpoint_new())
     }
-    var slot: Slot;
-    var index: CommitteeIndex;
-    var beacon_block_root: Root;
-    var source: Checkpoint;
-    var target: Checkpoint;
+    datatype IndexedAttestation = IndexedAttestation(
+        attesting_indices: ssz_List<ValidatorIndex>,
+        data: AttestationData,
+        signature: BLSSignature
+    )
+    function method IndexedAttestation_new(): IndexedAttestation {
+        IndexedAttestation(List_new<ValidatorIndex>([]), AttestationData_new(), BLSSignature_default)
     }
-    class IndexedAttestation {
-    constructor() {
-        attesting_indices := List_new<ValidatorIndex>([]);
-        data := new AttestationData();
-        signature := BLSSignature_default;
+    datatype PendingAttestation = PendingAttestation(
+        aggregation_bits: Bitlist,
+        data: AttestationData,
+        inclusion_delay: Slot,
+        proposer_index: ValidatorIndex
+    )
+    function method PendingAttestation_new(): PendingAttestation {
+        PendingAttestation(Bitlist_new([]), AttestationData_new(), Slot_default, ValidatorIndex_default)
     }
-    var attesting_indices: ssz_List<ValidatorIndex>;
-    var data: AttestationData;
-    var signature: BLSSignature;
+    datatype Eth1Data = Eth1Data(
+        deposit_root: Root,
+        deposit_count: uint64,
+        block_hash: Hash32
+    )
+    function method Eth1Data_new(): Eth1Data {
+        Eth1Data(Root_default, 0, Hash32_default)
     }
-    class PendingAttestation {
-    constructor() {
-        aggregation_bits := Bitlist_new([]);
-        data := new AttestationData();
-        inclusion_delay := Slot_default;
-        proposer_index := ValidatorIndex_default;
+    datatype HistoricalBatch = HistoricalBatch(
+        block_roots: ssz_Vector<Root>,
+        state_roots: ssz_Vector<Root>
+    )
+    function method HistoricalBatch_new(): HistoricalBatch {
+        HistoricalBatch(Vector_new<Root>(), Vector_new<Root>())
     }
-    var aggregation_bits: Bitlist;
-    var data: AttestationData;
-    var inclusion_delay: Slot;
-    var proposer_index: ValidatorIndex;
+    datatype DepositMessage = DepositMessage(
+        pubkey: BLSPubkey,
+        withdrawal_credentials: Bytes32,
+        amount: Gwei
+    )
+    function method DepositMessage_new(): DepositMessage {
+        DepositMessage(BLSPubkey_default, Bytes32_default, Gwei_default)
     }
-    class Eth1Data {
-    constructor() {
-        deposit_root := Root_default;
-        deposit_count := 0;
-        block_hash := Hash32_default;
+    datatype DepositData = DepositData(
+        pubkey: BLSPubkey,
+        withdrawal_credentials: Bytes32,
+        amount: Gwei,
+        signature: BLSSignature
+    )
+    function method DepositData_new(): DepositData {
+        DepositData(BLSPubkey_default, Bytes32_default, Gwei_default, BLSSignature_default)
     }
-    var deposit_root: Root;
-    var deposit_count: uint64;
-    var block_hash: Hash32;
+    datatype BeaconBlockHeader = BeaconBlockHeader(
+        slot: Slot,
+        proposer_index: ValidatorIndex,
+        parent_root: Root,
+        state_root: Root,
+        body_root: Root
+    )
+    function method BeaconBlockHeader_new(): BeaconBlockHeader {
+        BeaconBlockHeader(Slot_default, ValidatorIndex_default, Root_default, Root_default, Root_default)
     }
-    class HistoricalBatch {
-    constructor() {
-        block_roots := Vector_new<Root>();
-        state_roots := Vector_new<Root>();
+    datatype SigningData = SigningData(
+        object_root: Root,
+        domain: Domain
+    )
+    function method SigningData_new(): SigningData {
+        SigningData(Root_default, Domain_default)
     }
-    var block_roots: ssz_Vector<Root>;
-    var state_roots: ssz_Vector<Root>;
+    datatype ProposerSlashing = ProposerSlashing(
+        signed_header_1: SignedBeaconBlockHeader,
+        signed_header_2: SignedBeaconBlockHeader
+    )
+    function method ProposerSlashing_new(): ProposerSlashing {
+        ProposerSlashing(SignedBeaconBlockHeader_new(), SignedBeaconBlockHeader_new())
     }
-    class DepositMessage {
-    constructor() {
-        pubkey := BLSPubkey_default;
-        withdrawal_credentials := Bytes32_default;
-        amount := Gwei_default;
+    datatype AttesterSlashing = AttesterSlashing(
+        attestation_1: IndexedAttestation,
+        attestation_2: IndexedAttestation
+    )
+    function method AttesterSlashing_new(): AttesterSlashing {
+        AttesterSlashing(IndexedAttestation_new(), IndexedAttestation_new())
     }
-    var pubkey: BLSPubkey;
-    var withdrawal_credentials: Bytes32;
-    var amount: Gwei;
+    datatype Attestation = Attestation(
+        aggregation_bits: Bitlist,
+        data: AttestationData,
+        signature: BLSSignature
+    )
+    function method Attestation_new(): Attestation {
+        Attestation(Bitlist_new([]), AttestationData_new(), BLSSignature_default)
     }
-    class DepositData {
-    constructor() {
-        pubkey := BLSPubkey_default;
-        withdrawal_credentials := Bytes32_default;
-        amount := Gwei_default;
-        signature := BLSSignature_default;
+    datatype Deposit = Deposit(
+        proof: ssz_Vector<Bytes32>,
+        data: DepositData
+    )
+    function method Deposit_new(): Deposit {
+        Deposit(Vector_new<Bytes32>(), DepositData_new())
     }
-    var pubkey: BLSPubkey;
-    var withdrawal_credentials: Bytes32;
-    var amount: Gwei;
-    var signature: BLSSignature;
+    datatype VoluntaryExit = VoluntaryExit(
+        epoch: Epoch,
+        validator_index: ValidatorIndex
+    )
+    function method VoluntaryExit_new(): VoluntaryExit {
+        VoluntaryExit(Epoch_default, ValidatorIndex_default)
     }
-    class BeaconBlockHeader {
-    constructor() {
-        slot := Slot_default;
-        proposer_index := ValidatorIndex_default;
-        parent_root := Root_default;
-        state_root := Root_default;
-        body_root := Root_default;
+    datatype BeaconBlockBody = BeaconBlockBody(
+        randao_reveal: BLSSignature,
+        eth1_data: Eth1Data,
+        graffiti: Bytes32,
+        proposer_slashings: ssz_List<ProposerSlashing>,
+        attester_slashings: ssz_List<AttesterSlashing>,
+        attestations: ssz_List<Attestation>,
+        deposits: ssz_List<Deposit>,
+        voluntary_exits: ssz_List<SignedVoluntaryExit>
+    )
+    function method BeaconBlockBody_new(): BeaconBlockBody {
+        BeaconBlockBody(BLSSignature_default, Eth1Data_new(), Bytes32_default, List_new<ProposerSlashing>([]), List_new<AttesterSlashing>([]), List_new<Attestation>([]), List_new<Deposit>([]), List_new<SignedVoluntaryExit>([]))
     }
-    var slot: Slot;
-    var proposer_index: ValidatorIndex;
-    var parent_root: Root;
-    var state_root: Root;
-    var body_root: Root;
+    datatype BeaconBlock = BeaconBlock(
+        slot: Slot,
+        proposer_index: ValidatorIndex,
+        parent_root: Root,
+        state_root: Root,
+        body: BeaconBlockBody
+    )
+    {
+        function method copy(): BeaconBlock
     }
-    class SigningData {
-    constructor() {
-        object_root := Root_default;
-        domain := Domain_default;
-    }
-    var object_root: Root;
-    var domain: Domain;
-    }
-    class ProposerSlashing {
-    constructor() {
-        signed_header_1 := new SignedBeaconBlockHeader();
-        signed_header_2 := new SignedBeaconBlockHeader();
-    }
-    var signed_header_1: SignedBeaconBlockHeader;
-    var signed_header_2: SignedBeaconBlockHeader;
-    }
-    class AttesterSlashing {
-    constructor() {
-        attestation_1 := new IndexedAttestation();
-        attestation_2 := new IndexedAttestation();
-    }
-    var attestation_1: IndexedAttestation;
-    var attestation_2: IndexedAttestation;
-    }
-    class Attestation {
-    constructor() {
-        aggregation_bits := Bitlist_new([]);
-        data := new AttestationData();
-        signature := BLSSignature_default;
-    }
-    var aggregation_bits: Bitlist;
-    var data: AttestationData;
-    var signature: BLSSignature;
-    }
-    class Deposit {
-    constructor() {
-        proof := Vector_new<Bytes32>();
-        data := new DepositData();
-    }
-    var proof: ssz_Vector<Bytes32>;
-    var data: DepositData;
-    }
-    class VoluntaryExit {
-    constructor() {
-        epoch := Epoch_default;
-        validator_index := ValidatorIndex_default;
-    }
-    var epoch: Epoch;
-    var validator_index: ValidatorIndex;
-    }
-    class BeaconBlockBody {
-    constructor() {
-        randao_reveal := BLSSignature_default;
-        eth1_data := new Eth1Data();
-        graffiti := Bytes32_default;
-        proposer_slashings := List_new<ProposerSlashing>([]);
-        attester_slashings := List_new<AttesterSlashing>([]);
-        attestations := List_new<Attestation>([]);
-        deposits := List_new<Deposit>([]);
-        voluntary_exits := List_new<SignedVoluntaryExit>([]);
-    }
-    var randao_reveal: BLSSignature;
-    var eth1_data: Eth1Data;
-    var graffiti: Bytes32;
-    var proposer_slashings: ssz_List<ProposerSlashing>;
-    var attester_slashings: ssz_List<AttesterSlashing>;
-    var attestations: ssz_List<Attestation>;
-    var deposits: ssz_List<Deposit>;
-    var voluntary_exits: ssz_List<SignedVoluntaryExit>;
-    }
-    class BeaconBlock {
-    constructor() {
-        slot := Slot_default;
-        proposer_index := ValidatorIndex_default;
-        parent_root := Root_default;
-        state_root := Root_default;
-        body := new BeaconBlockBody();
-    }
-    var slot: Slot;
-    var proposer_index: ValidatorIndex;
-    var parent_root: Root;
-    var state_root: Root;
-    var body: BeaconBlockBody;
-    function method copy(): BeaconBlock
+    function method BeaconBlock_new(): BeaconBlock{
+        BeaconBlock(Slot_default, ValidatorIndex_default, Root_default, Root_default, BeaconBlockBody_new())
     }
     class BeaconState {
     constructor() {
         genesis_time := 0;
         genesis_validators_root := Root_default;
         slot := Slot_default;
-        fork := new Fork();
-        latest_block_header := new BeaconBlockHeader();
+        fork := Fork_new();
+        latest_block_header := BeaconBlockHeader_new();
         block_roots := Vector_new<Root>();
         state_roots := Vector_new<Root>();
         historical_roots := List_new<Root>([]);
-        eth1_data := new Eth1Data();
+        eth1_data := Eth1Data_new();
         eth1_data_votes := List_new<Eth1Data>([]);
         eth1_deposit_index := 0;
         validators := List_new<Validator>([]);
@@ -267,86 +232,89 @@ module Classes {
     var finalized_checkpoint: Checkpoint;
     function method copy(): BeaconState
     }
-    class SignedVoluntaryExit {
-    constructor() {
-        message := new VoluntaryExit();
-        signature := BLSSignature_default;
+    datatype SignedVoluntaryExit = SignedVoluntaryExit(
+        message: VoluntaryExit,
+        signature: BLSSignature
+    )
+    function method SignedVoluntaryExit_new(): SignedVoluntaryExit {
+        SignedVoluntaryExit(VoluntaryExit_new(), BLSSignature_default)
     }
-    var message: VoluntaryExit;
-    var signature: BLSSignature;
+    datatype SignedBeaconBlock = SignedBeaconBlock(
+        message: BeaconBlock,
+        signature: BLSSignature
+    )
+    function method SignedBeaconBlock_new(): SignedBeaconBlock {
+        SignedBeaconBlock(BeaconBlock_new(), BLSSignature_default)
     }
-    class SignedBeaconBlock {
-    constructor() {
-        message := new BeaconBlock();
-        signature := BLSSignature_default;
+    datatype SignedBeaconBlockHeader = SignedBeaconBlockHeader(
+        message: BeaconBlockHeader,
+        signature: BLSSignature
+    )
+    function method SignedBeaconBlockHeader_new(): SignedBeaconBlockHeader {
+        SignedBeaconBlockHeader(BeaconBlockHeader_new(), BLSSignature_default)
     }
-    var message: BeaconBlock;
-    var signature: BLSSignature;
+    datatype Eth1Block = Eth1Block(
+        timestamp: uint64,
+        deposit_root: Root,
+        deposit_count: uint64
+    )
+    function method Eth1Block_new(): Eth1Block {
+        Eth1Block(0, Root_default, 0)
     }
-    class SignedBeaconBlockHeader {
-    constructor() {
-        message := new BeaconBlockHeader();
-        signature := BLSSignature_default;
+    datatype AggregateAndProof = AggregateAndProof(
+        aggregator_index: ValidatorIndex,
+        aggregate: Attestation,
+        selection_proof: BLSSignature
+    )
+    function method AggregateAndProof_new(): AggregateAndProof {
+        AggregateAndProof(ValidatorIndex_default, Attestation_new(), BLSSignature_default)
     }
-    var message: BeaconBlockHeader;
-    var signature: BLSSignature;
-    }
-    class Eth1Block {
-    constructor() {
-        timestamp := 0;
-        deposit_root := Root_default;
-        deposit_count := 0;
-    }
-    var timestamp: uint64;
-    var deposit_root: Root;
-    var deposit_count: uint64;
-    }
-    class AggregateAndProof {
-    constructor() {
-        aggregator_index := ValidatorIndex_default;
-        aggregate := new Attestation();
-        selection_proof := BLSSignature_default;
-    }
-    var aggregator_index: ValidatorIndex;
-    var aggregate: Attestation;
-    var selection_proof: BLSSignature;
-    }
-    class SignedAggregateAndProof {
-    constructor() {
-        message := new AggregateAndProof();
-        signature := BLSSignature_default;
-    }
-    var message: AggregateAndProof;
-    var signature: BLSSignature;
+    datatype SignedAggregateAndProof = SignedAggregateAndProof(
+        message: AggregateAndProof,
+        signature: BLSSignature
+    )
+    function method SignedAggregateAndProof_new(): SignedAggregateAndProof {
+        SignedAggregateAndProof(AggregateAndProof_new(), BLSSignature_default)
     }
     datatype LatestMessage = LatestMessage(epoch: Epoch, root: Root)
     function method LatestMessage_new(): LatestMessage
     class Store {
-    constructor() {
-        time := 0;
-        genesis_time := 0;
-        justified_checkpoint := Checkpoint_new();
-        finalized_checkpoint := Checkpoint_new();
-        best_justified_checkpoint := Checkpoint_new();
-        proposer_boost_root := Root_default;
-        equivocating_indices := Set_new([]);
-        blocks := Dict_new<Root,BeaconBlock>([]);
-        block_states := Dict_new<Root,BeaconState>([]);
-        checkpoint_states := Dict_new<Checkpoint,BeaconState>([]);
-        latest_messages := Dict_new<ValidatorIndex,LatestMessage>([]);
+        constructor() {
+            time := 0;
+            genesis_time := 0;
+            justified_checkpoint := Checkpoint_new();
+            finalized_checkpoint := Checkpoint_new();
+            best_justified_checkpoint := Checkpoint_new();
+            proposer_boost_root := Root_default;
+            equivocating_indices := Set_new([]);
+            blocks := Dict_new<Root,BeaconBlock>([]);
+            block_states := Dict_new<Root,BeaconState>([]);
+            checkpoint_states := Dict_new<Checkpoint,BeaconState>([]);
+            latest_messages := Dict_new<ValidatorIndex,LatestMessage>([]);
+        }
+        constructor Init(time: uint64, genesis_time: uint64, justified_checkpoint: Checkpoint, finalized_checkpoint: Checkpoint, best_justified_checkpoint: Checkpoint, proposer_boost_root: Root, equivocating_indices: Set<ValidatorIndex>, blocks: Dict<Root,BeaconBlock>, block_states: Dict<Root,BeaconState>, checkpoint_states: Dict<Checkpoint,BeaconState>, latest_messages: Dict<ValidatorIndex,LatestMessage>) {
+            this.time := time;
+            this.genesis_time := genesis_time;
+            this.justified_checkpoint := justified_checkpoint;
+            this.finalized_checkpoint := finalized_checkpoint;
+            this.best_justified_checkpoint := best_justified_checkpoint;
+            this.proposer_boost_root := proposer_boost_root;
+            this.equivocating_indices := equivocating_indices;
+            this.blocks := blocks;
+            this.block_states := block_states;
+            this.checkpoint_states := checkpoint_states;
+            this.latest_messages := latest_messages;
+        }
+        var time: uint64;
+        const genesis_time: uint64;
+        var justified_checkpoint: Checkpoint;
+        var finalized_checkpoint: Checkpoint;
+        var best_justified_checkpoint: Checkpoint;
+        var proposer_boost_root: Root;
+        const equivocating_indices: Set<ValidatorIndex>;
+        var blocks: Dict<Root,BeaconBlock>;
+        var block_states: Dict<Root,BeaconState>;
+        var checkpoint_states: Dict<Checkpoint,BeaconState>;
+        const latest_messages: Dict<ValidatorIndex,LatestMessage>;
     }
-    var time: uint64;
-    var genesis_time: uint64;
-    var justified_checkpoint: Checkpoint;
-    var finalized_checkpoint: Checkpoint;
-    var best_justified_checkpoint: Checkpoint;
-    var proposer_boost_root: Root;
-    var equivocating_indices: Set<ValidatorIndex>;
-    var blocks: Dict<Root,BeaconBlock>;
-    var block_states: Dict<Root,BeaconState>;
-    var checkpoint_states: Dict<Checkpoint,BeaconState>;
-    var latest_messages: Dict<ValidatorIndex,LatestMessage>;
-
-    }
-    function method Store_new(time: uint64, genesis_time: uint64, justified_checkpoint: Checkpoint, finalized_checkpoint: Checkpoint, best_justified_checkpoint: Checkpoint, proposer_boost_root: Root, equivocating_indices: Set<ValidatorIndex>, blocks: Dict<Root,BeaconBlock>, block_states: Dict<Root,BeaconState>, checkpoint_states: Dict<Checkpoint,BeaconState>, latest_messages: Dict<ValidatorIndex,LatestMessage>): Store
 }
