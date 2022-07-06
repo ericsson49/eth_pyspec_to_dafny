@@ -165,7 +165,7 @@ returns (status_: Status, ret_: Root)
     if len(children) == 0 {
       return Success, head_2;
     }
-    var head_1: Root :- a_(max(children, (root: Root) => (get_latest_attesting_balance(store, root), root)));
+    var head_1: Root :- a_(max_f(children, (root: Root) => var tmp_0 := get_latest_attesting_balance(store, root); if (tmp_0.0.IsFailure()) then (Failure, (Gwei_default, Root_default)) else (Success, (tmp_0.1, root))));
     head_2 := head_1;
   }
 }
