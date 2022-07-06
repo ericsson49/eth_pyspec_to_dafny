@@ -134,7 +134,7 @@ module SSZ {
     function method filter<T>(f: (T) -> bool, s: Collection<T>): Sequence<T>
     function method filter_f<T>(f: (T) -> (Status, bool), s: Collection<T>): (Status, Sequence<T>)
     function method pymap<A,B>(f: (A) -> B, s: Collection<A>): Sequence<B>
-    function method max<A,B>(a: Collection<A>, key: (A) -> B): (Status, A)
+    function method max_f<A,B>(a: Collection<A>, key: (A) -> (Status, B)): (Status, A)
     function method sum(a: Collection<nat>): nat
 
     function method pow(a: nat, b: nat): nat
