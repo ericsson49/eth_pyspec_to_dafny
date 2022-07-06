@@ -335,6 +335,19 @@ module Classes {
         checkpoint_states := Dict_new<Checkpoint,BeaconState>([]);
         latest_messages := Dict_new<ValidatorIndex,LatestMessage>([]);
     }
+    constructor Init(time: uint64, genesis_time: uint64, justified_checkpoint: Checkpoint, finalized_checkpoint: Checkpoint, best_justified_checkpoint: Checkpoint, proposer_boost_root: Root, equivocating_indices: Set<ValidatorIndex>, blocks: Dict<Root,BeaconBlock>, block_states: Dict<Root,BeaconState>, checkpoint_states: Dict<Checkpoint,BeaconState>, latest_messages: Dict<ValidatorIndex,LatestMessage>) {
+        this.time := time;
+        this.genesis_time := genesis_time;
+        this.justified_checkpoint := justified_checkpoint;
+        this.finalized_checkpoint := finalized_checkpoint;
+        this.best_justified_checkpoint := best_justified_checkpoint;
+        this.proposer_boost_root := proposer_boost_root;
+        this.equivocating_indices := equivocating_indices;
+        this.blocks := blocks;
+        this.block_states := block_states;
+        this.checkpoint_states := checkpoint_states;
+        this.latest_messages := latest_messages;
+    }
     var time: uint64;
     var genesis_time: uint64;
     var justified_checkpoint: Checkpoint;
@@ -346,7 +359,5 @@ module Classes {
     var block_states: Dict<Root,BeaconState>;
     var checkpoint_states: Dict<Checkpoint,BeaconState>;
     var latest_messages: Dict<ValidatorIndex,LatestMessage>;
-
     }
-    function method Store_new(time: uint64, genesis_time: uint64, justified_checkpoint: Checkpoint, finalized_checkpoint: Checkpoint, best_justified_checkpoint: Checkpoint, proposer_boost_root: Root, equivocating_indices: Set<ValidatorIndex>, blocks: Dict<Root,BeaconBlock>, block_states: Dict<Root,BeaconState>, checkpoint_states: Dict<Checkpoint,BeaconState>, latest_messages: Dict<ValidatorIndex,LatestMessage>): Store
 }
