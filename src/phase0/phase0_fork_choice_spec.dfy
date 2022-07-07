@@ -177,18 +177,20 @@ returns (status_: Status, ret_: Root)
 
     See https://ethresear.ch/t/prevention-of-bouncing-attack-on-ffg/6114 for more detailed analysis and discussion.
     */
-method should_update_justified_checkpoint(store: Store, new_justified_checkpoint: Checkpoint)
-returns (status_: Status, ret_: bool) 
+function method should_update_justified_checkpoint(store: Store, new_justified_checkpoint: Checkpoint): (Status, bool) 
 {
-  if compute_slots_since_epoch_start(get_current_slot(store)) < SAFE_SLOTS_TO_UPDATE_JUSTIFIED {
-    return Success, true;
-  }
-  var justified_slot: Slot := compute_start_slot_at_epoch(store.justified_checkpoint.epoch);
-  var tmp_0 :- a_(get_ancestor(store, new_justified_checkpoint.root, justified_slot));
-  if !(tmp_0 == store.justified_checkpoint.root) {
-    return Success, false;
-  }
-  return Success, true;
+  if compute_slots_since_epoch_start(get_current_slot(store)) < SAFE_SLOTS_TO_UPDATE_JUSTIFIED then
+    (Success, true)
+  else
+    var justified_slot: Slot := compute_start_slot_at_epoch(store.justified_checkpoint.epoch);
+    var tmp_0 := get_ancestor(store, new_justified_checkpoint.root, justified_slot);
+    if tmp_0.0.IsFailure() then
+      (Failure, false)
+    else
+      if !(tmp_0.1 == store.justified_checkpoint.root) then
+        (Success, false)
+      else
+        (Success, true)
 }
 
 method validate_target_epoch_against_current_time(store: Store, attestation: Attestation)
@@ -234,7 +236,7 @@ method update_latest_messages(store: Store, attesting_indices: Sequence<Validato
 {
   var target: Checkpoint := attestation.data.target;
   var beacon_block_root: Root := attestation.data.beacon_block_root;
-  var non_equivocating_attesting_indices: PyList<ValidatorIndex> := pylist(pymap((i) => i, filter((i) => !store.equivocating_indices.contains(i), attesting_indices)));
+  var non_equivocating_attesting_indices: PyList<ValidatorIndex> := pylist(filter((i) => !store.equivocating_indices.contains(i), attesting_indices));
   var tmp_for_0: Iterator<ValidatorIndex> := iter(non_equivocating_attesting_indices);
   while has_next(tmp_for_0) {
     var i: ValidatorIndex := next(tmp_for_0);
@@ -290,7 +292,7 @@ returns (status_: Status)
     if state.current_justified_checkpoint.epoch > store.best_justified_checkpoint.epoch {
       store.best_justified_checkpoint := state.current_justified_checkpoint;
     }
-    var tmp_2 :- should_update_justified_checkpoint(store, state.current_justified_checkpoint);
+    var tmp_2 :- a_(should_update_justified_checkpoint(store, state.current_justified_checkpoint));
     if tmp_2 {
       store.justified_checkpoint := state.current_justified_checkpoint;
     }
