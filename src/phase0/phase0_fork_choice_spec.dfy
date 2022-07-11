@@ -42,8 +42,13 @@ returns (status_: Status, ret_: Store)
   var justified_checkpoint: Checkpoint := Checkpoint(anchor_epoch, anchor_root);
   var finalized_checkpoint: Checkpoint := Checkpoint(anchor_epoch, anchor_root);
   var proposer_boost_root: Root := Root_new(0);
-  var tmp_0 := new Store.Init(uint64_new(anchor_state.genesis_time + (SECONDS_PER_SLOT * anchor_state.slot)), anchor_state.genesis_time, justified_checkpoint, finalized_checkpoint, justified_checkpoint, proposer_boost_root, Set_new([]), Dict_new([(anchor_root, anchor_block.copy())]), Dict_new([(anchor_root, anchor_state.copy())]), Dict_new([(justified_checkpoint, anchor_state.copy())]), Dict_new([]));
-  return Success, tmp_0;
+  var tmp_0 := Set_new({});
+  var tmp_1 := Dict_new(map[anchor_root := anchor_block.copy()]);
+  var tmp_2 := Dict_new(map[anchor_root := anchor_state.copy()]);
+  var tmp_3 := Dict_new(map[justified_checkpoint := anchor_state.copy()]);
+  var tmp_4 := Dict_new(map[]);
+  var tmp_5 := new Store.Init(uint64_new(anchor_state.genesis_time + (SECONDS_PER_SLOT * anchor_state.slot)), anchor_state.genesis_time, justified_checkpoint, finalized_checkpoint, justified_checkpoint, proposer_boost_root, tmp_0, tmp_1, tmp_2, tmp_3, tmp_4);
+  return Success, tmp_5;
 }
 
 function method get_slots_since_genesis(store: Store): int
@@ -62,6 +67,7 @@ function method compute_slots_since_epoch_start(slot: Slot): int
 }
 
 function method get_ancestor(store: Store, root: Root, slot: Slot): (Status, Root)
+reads store, store.blocks
 {
   var tmp_0 := store.blocks.get(root);
   if tmp_0.0.IsFailure() then
@@ -78,6 +84,7 @@ function method get_ancestor(store: Store, root: Root, slot: Slot): (Status, Roo
 }
 
 function method get_latest_attesting_balance(store: Store, root: Root): (Status, Gwei) 
+reads store, store.blocks, store.checkpoint_states
 {
   var tmp_0 := store.checkpoint_states.get(store.justified_checkpoint);
   if tmp_0.0.IsFailure() then
@@ -85,7 +92,8 @@ function method get_latest_attesting_balance(store: Store, root: Root): (Status,
   else
     var state: BeaconState := tmp_0.1;
     var active_indices: Sequence<ValidatorIndex> := get_active_validator_indices(state, get_current_epoch(state));
-    var attestation_score: Gwei := Gwei_new(sum(pymap((i) => state.validators.get(i).effective_balance, filter((i) => store.latest_messages.contains(i) && !store.equivocating_indices.contains(i) && get_ancestor(store, store.latest_messages.get(i).root, store.blocks.get(root).slot) == root, active_indices))));
+    // TODO: implement exception handling
+    var attestation_score: Gwei := Gwei_new(sum(pymap((i) => state.validators.get(i).1.effective_balance, filter((i) => store.latest_messages.contains(i) && !store.equivocating_indices.contains(i) && get_ancestor(store, store.latest_messages.get(i).1.root, store.blocks.get(root).1.slot).1 == root, active_indices))));
     if store.proposer_boost_root == Root_new(0) then
       (Success, attestation_score)
     else
@@ -115,7 +123,8 @@ method filter_block_tree(store: Store, block_root: Root, blocks: Dict<Root,Beaco
 returns (status_: Status, ret_: bool) 
 {
   var block: BeaconBlock :- a_(store.blocks.get(block_root));
-  var children: PyList<Root> := pylist(filter((root) => store.blocks.get_nf(root).parent_root == block_root, store.blocks.keys()));
+  var tmp_0 := Set_new(store.blocks.keys());
+  var children: PyList<Root> := pylist(filter((root) => store.blocks.get_nf(root).parent_root == block_root, tmp_0));
   if any(children) {
     var tmp_0 := iter(children);
     var tmp_1 := PyList_new([]);
@@ -132,9 +141,9 @@ returns (status_: Status, ret_: bool)
     return Success, false;
   }
   var head_state: BeaconState :- a_(store.block_states.get(block_root));
-  var correct_justified: bool := if (store.justified_checkpoint.epoch == GENESIS_EPOCH) then true else head_state.current_justified_checkpoint == store.justified_checkpoint;
-  var correct_finalized: bool := if (store.finalized_checkpoint.epoch == GENESIS_EPOCH) then true else head_state.finalized_checkpoint == store.finalized_checkpoint;
-  if if (correct_justified) then correct_finalized else false {
+  var correct_justified: bool := store.justified_checkpoint.epoch == GENESIS_EPOCH || head_state.current_justified_checkpoint == store.justified_checkpoint;
+  var correct_finalized: bool := store.finalized_checkpoint.epoch == GENESIS_EPOCH || head_state.finalized_checkpoint == store.finalized_checkpoint;
+  if correct_justified && correct_finalized {
     blocks.set_value(block_root, block);
     return Success, true;
   }
@@ -149,7 +158,7 @@ method get_filtered_block_tree(store: Store)
 returns (status_: Status, ret_: Dict<Root,BeaconBlock>) 
 {
   var base: Root := store.justified_checkpoint.root;
-  var blocks: Dict<Root,BeaconBlock> := Dict_new([]);
+  var blocks: Dict<Root,BeaconBlock> := Dict_new(map[]);
   var a, b := filter_block_tree(store, base, blocks);
   return Success, blocks;
 }
@@ -161,7 +170,8 @@ returns (status_: Status, ret_: Root)
   var head: Root := store.justified_checkpoint.root;
   var head_2 := head;
   while true {
-    var children: PyList<Root> := pylist(filter((root) => blocks.get_nf(root).parent_root == head_2, blocks.keys()));
+    var tmp_0 := Set_new(blocks.keys());
+    var children: PyList<Root> := pylist(filter((root) => blocks.get_nf(root).parent_root == head_2, tmp_0));
     if len(children) == 0 {
       return Success, head_2;
     }
@@ -199,7 +209,8 @@ returns (status_: Status)
   var target: Checkpoint := attestation.data.target;
   var current_epoch: Epoch := compute_epoch_at_slot(get_current_slot(store));
   var previous_epoch: Epoch := if (current_epoch > GENESIS_EPOCH) then current_epoch - 1 else GENESIS_EPOCH;
-  :- pyassert(PyList_new([current_epoch, previous_epoch]).contains(target.epoch));
+  var tmp_0 := PyList_new([current_epoch, previous_epoch]);
+  :- pyassert(tmp_0.contains(target.epoch));
 }
 
 method validate_on_attestation(store: Store, attestation: Attestation, is_from_block: bool)
@@ -255,7 +266,7 @@ returns (status_: Status)
   if current_slot > previous_slot {
     store.proposer_boost_root := Root_new(0);
   }
-  if !if (current_slot > previous_slot) then compute_slots_since_epoch_start(current_slot) == 0 else false {
+  if !(current_slot > previous_slot && compute_slots_since_epoch_start(current_slot) == 0) {
     return;
   }
   if store.best_justified_checkpoint.epoch > store.justified_checkpoint.epoch {
@@ -285,7 +296,7 @@ returns (status_: Status)
   store.block_states.set_value(hash_tree_root(block), state);
   var time_into_slot: uint64 := (store.time - store.genesis_time) % SECONDS_PER_SLOT;
   var is_before_attesting_interval: bool := time_into_slot < (SECONDS_PER_SLOT / INTERVALS_PER_SLOT);
-  if if (get_current_slot(store) == block.slot) then is_before_attesting_interval else false {
+  if get_current_slot(store) == block.slot && is_before_attesting_interval {
     store.proposer_boost_root := Root_new(hash_tree_root(block));
   }
   if state.current_justified_checkpoint.epoch > store.justified_checkpoint.epoch {

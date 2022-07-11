@@ -46,46 +46,67 @@ module SSZ {
     type Bytes48 = nat
     type Bytes96 = nat
     trait Iterator<T> {
+        ghost var decreases_ : nat;
         function method has_next(): bool
-        method next() returns (ret_: T) modifies this
-
+        ensures decreases_ > 0 <==> has_next()
+        method next() returns (ret_: T)
+        requires has_next()
+        modifies this
+        ensures old(decreases_) == decreases_ + 1
     }
     trait Collection<T> {
-        function method contains(k: T): bool
+        function method contains(k: T): bool reads this
     }
     trait Sequence<T> extends Collection<T> {
         function method get(k: nat): (Status, T)
         function method get_nf(i: nat): T
     }
-    class Dict<K,V> {
-        function method keys(): Sequence<K>
+    class Dict<K(==),V> {
+        var repr: map<K,V>;
+        function values(): set<V> reads this {
+            repr.Values
+        }
+        function method keys(): set<K> reads this {
+            repr.Keys
+        }
         function method contains(k: K): bool
-        function method get(k: K): (Status, V)
-        function method get_nf(k: K): V requires contains(k)
-        method set_value(k: K, v: V)
+        reads this
+        ensures contains(k) <==> k in repr
+        {
+            k in repr
+        }
+        function method get(k: K): (Status, V) reads this
+        function method get_nf(k: K): V reads this requires contains(k) {
+            repr[k]
+        }
+        method set_value(k: K, v: V) modifies this {
+            repr := repr[k := v];
+        }
     }
-    class Set<T> extends Collection<T> {
+    class Set<T(==)> extends Collection<T> {
+        var repr: set<T>
         constructor empty() {}
         constructor(t: seq<T>) {}
-        function method contains(k: T): bool
+        function method contains(k: T): bool reads this
         function method intersection(s: Sequence<T>): Set<T>
         method add(e: T) modifies this
     }
-    class PyList<T> extends Sequence<T> {
+    class PyList<T(==)> extends Sequence<T> {
+        var repr: seq<T>
         constructor empty() {}
         constructor(t: seq<T>) {}
-        function method contains(k: T): bool
+        function method contains(k: T): bool reads this
         function method get(k: nat): (Status, T)
         function method get_nf(i: nat): T
         method append(e: T) modifies this
     }
     class ssz_List<T> extends Sequence<T> {
-        function method contains(k: T): bool
+        function method contains(k: T): bool reads this
         function method get(k: nat): (Status, T)
         function method get_nf(i: nat): T
     }
     class ssz_Vector<T> extends Sequence<T> {
-        function method contains(k: T): bool
+        function method contains(k: T): bool reads this
         function method get(k: nat): (Status, T)
         function method get_nf(i: nat): T
     }
@@ -95,13 +116,15 @@ module SSZ {
     function method hash(a: nat): Bytes32
     function method hash_tree_root<T>(a: T): Bytes32
 
-    function method iter<T>(a: Collection<T>): Iterator<T>
+    method iter<T>(a: Collection<T>) returns (ret_: Iterator<T>) ensures fresh(ret_)
     function method has_next<T>(a: Iterator<T>): bool {
         a.has_next()
     }
     method next<T>(a: Iterator<T>)
     returns (ret_: T)
+    requires a.has_next()
     modifies a
+    ensures old(a.decreases_) == a.decreases_ + 1
     {
         ret_ := a.next();
     }
@@ -118,11 +141,16 @@ module SSZ {
 
     function method Bitlist_new(a: seq<bool>): Bitlist
     function method Bitvector_new(): Bitvector
-    function method Dict_new<K,V>(a: seq<(K,V)>): Dict<K,V>
-    function method PyList_empty<T>(): PyList<T> { PyList_new([]) }
-    function method PyList_new<T>(a: seq<T>): PyList<T>
-    function method Set_empty<T>(): Set<T> { Set_new([]) }
-    function method Set_new<T>(a: seq<T>): Set<T>
+    method Dict_new<K,V>(a: map<K,V>) returns (ret_: Dict<K,V>) ensures ret_.repr == a && fresh(ret_)
+
+    method PyList_empty<T>() returns (ret_: PyList<T>)
+    ensures ret_.repr == [] && fresh(ret_)
+    {
+        ret_ := PyList_new([]);
+    }
+    method PyList_new<T>(a: seq<T>) returns (ret_: PyList<T>) ensures ret_.repr == a && fresh(ret_)
+    method Set_empty<T>() returns (ret_: Set<T>) { ret_ := Set_new({}); }
+    method Set_new<T>(a: set<T>) returns (ret_: Set<T>) ensures ret_.repr == a && fresh(ret_)
     function method List_new<T>(a: seq<T>): ssz_List<T>
     function method Vector_new<T>(): ssz_Vector<T>
 
