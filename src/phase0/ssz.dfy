@@ -10,18 +10,18 @@ module SSZ {
             Failure
         }
     }
-    
-    function method a_<T>(r: Outcome<T>): COutcome<T>
-    {
-        if r.IsFailure() then
-            CException
-        else
-            CResult(r.Extract())
-    }
 
     /*method a_<T>(r: (Status, T)) returns (status_: Status, ret_: T) {
         ret_ :- r.0, r.1;
     }*/
+
+    function method b_<T>(r: Outcome<T>): NEOutcome
+    {
+        if r.IsFailure() then
+            NEException
+        else
+            NEResult(r.Extract())
+    }
 
     datatype Outcome<T> =
     | Result(value: T)
@@ -40,20 +40,15 @@ module SSZ {
         }
     }
 
-    datatype COutcome<T> =
-    | CResult(value: T)
-    | CException
+    datatype NEOutcome<T> =
+    | NEResult(value: T)
+    | NEException
     {
-        predicate method IsFailure() { this.CException?  }
-        function method Extract(): T
-            requires !IsFailure()
-        {
-            this.value
-        }
-        function method PropagateFailure(): Status
+        predicate method IsFailure() { this.NEException?  }
+        function method PropagateFailure<U>(): NEOutcome<U>
             requires IsFailure()
         {
-            Failure
+            NEException
         }
     }
 
@@ -159,16 +154,14 @@ module SSZ {
     function method len<T>(a: Collection<T>): nat
     function method seq_get<T>(a: Sequence<T>, i: nat): T
 
-    function method pyassert(b: bool): Status
-    ensures b <==> pyassert(b).Success?
-    ensures !b <==> pyassert(b).Failure?
+    function method pyassert_(b: bool): NEOutcome<()>
+    ensures b <==> !pyassert(b).IsFailure()
     {
-      if b then Success else Failure
+      if b then NEResult(()) else NEException
     }
 
-    function method pyassert_(b: bool): Outcome<()>
-    ensures b <==> pyassert_(b).Result?
-    ensures !b <==> pyassert_(b).Exception?
+    function method pyassert(b: bool): Outcome<()>
+    ensures b <==> !pyassert(b).IsFailure()
     {
       if b then Result(()) else Exception
     }
