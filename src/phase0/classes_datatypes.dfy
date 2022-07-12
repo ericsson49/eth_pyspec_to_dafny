@@ -59,13 +59,13 @@ module Classes {
         IndexedAttestation([], AttestationData_new(), BLSSignature_default)
     }
     datatype PendingAttestation = PendingAttestation(
-        aggregation_bits: Bitlist,
+        aggregation_bits: seq<boolean>,
         data: AttestationData,
         inclusion_delay: Slot,
         proposer_index: ValidatorIndex
     )
     function method PendingAttestation_new(): PendingAttestation {
-        PendingAttestation(Bitlist_new([]), AttestationData_new(), Slot_default, ValidatorIndex_default)
+        PendingAttestation([], AttestationData_new(), Slot_default, ValidatorIndex_default)
     }
     datatype Eth1Data = Eth1Data(
         deposit_root: Root,
@@ -76,11 +76,11 @@ module Classes {
         Eth1Data(Root_default, 0, Hash32_default)
     }
     datatype HistoricalBatch = HistoricalBatch(
-        block_roots: ssz_Vector<Root>,
-        state_roots: ssz_Vector<Root>
+        block_roots: seq<Root>,
+        state_roots: seq<Root>
     )
     function method HistoricalBatch_new(): HistoricalBatch {
-        HistoricalBatch(Vector_new<Root>(), Vector_new<Root>())
+        HistoricalBatch([], [])
     }
     datatype DepositMessage = DepositMessage(
         pubkey: BLSPubkey,
@@ -131,19 +131,19 @@ module Classes {
         AttesterSlashing(IndexedAttestation_new(), IndexedAttestation_new())
     }
     datatype Attestation = Attestation(
-        aggregation_bits: Bitlist,
+        aggregation_bits: seq<boolean>,
         data: AttestationData,
         signature: BLSSignature
     )
     function method Attestation_new(): Attestation {
-        Attestation(Bitlist_new([]), AttestationData_new(), BLSSignature_default)
+        Attestation([], AttestationData_new(), BLSSignature_default)
     }
     datatype Deposit = Deposit(
-        proof: ssz_Vector<Bytes32>,
+        proof: seq<Bytes32>,
         data: DepositData
     )
     function method Deposit_new(): Deposit {
-        Deposit(Vector_new<Bytes32>(), DepositData_new())
+        Deposit([], DepositData_new())
     }
     datatype VoluntaryExit = VoluntaryExit(
         epoch: Epoch,
@@ -156,14 +156,14 @@ module Classes {
         randao_reveal: BLSSignature,
         eth1_data: Eth1Data,
         graffiti: Bytes32,
-        proposer_slashings: ssz_List<ProposerSlashing>,
-        attester_slashings: ssz_List<AttesterSlashing>,
-        attestations: ssz_List<Attestation>,
-        deposits: ssz_List<Deposit>,
-        voluntary_exits: ssz_List<SignedVoluntaryExit>
+        proposer_slashings: seq<ProposerSlashing>,
+        attester_slashings: seq<AttesterSlashing>,
+        attestations: seq<Attestation>,
+        deposits: seq<Deposit>,
+        voluntary_exits: seq<SignedVoluntaryExit>
     )
     function method BeaconBlockBody_new(): BeaconBlockBody {
-        BeaconBlockBody(BLSSignature_default, Eth1Data_new(), Bytes32_default, List_new<ProposerSlashing>([]), List_new<AttesterSlashing>([]), List_new<Attestation>([]), List_new<Deposit>([]), List_new<SignedVoluntaryExit>([]))
+        BeaconBlockBody(BLSSignature_default, Eth1Data_new(), Bytes32_default, [], [], [], [], [])
     }
     datatype BeaconBlock = BeaconBlock(
         slot: Slot,
@@ -198,7 +198,7 @@ module Classes {
         slashings: seq<Gwei>,
         previous_epoch_attestations: seq<PendingAttestation>,
         current_epoch_attestations: seq<PendingAttestation>,
-        justification_bits: Bitvector,
+        justification_bits: seq<boolean>,
         previous_justified_checkpoint: Checkpoint,
         current_justified_checkpoint: Checkpoint,
         finalized_checkpoint: Checkpoint
@@ -208,7 +208,7 @@ module Classes {
         }
     }
     function method BeaconState_new(): BeaconState {
-        BeaconState(0, Root_default, Slot_default, Fork_new(), BeaconBlockHeader_new(), [], [], [], Eth1Data_new(), [], 0, [], [], [], [], [], [], Bitvector_new(), Checkpoint_new(), Checkpoint_new(), Checkpoint_new())
+        BeaconState(0, Root_default, Slot_default, Fork_new(), BeaconBlockHeader_new(), [], [], [], Eth1Data_new(), [], 0, [], [], [], [], [], [], [], Checkpoint_new(), Checkpoint_new(), Checkpoint_new())
     }
     datatype SignedVoluntaryExit = SignedVoluntaryExit(
         message: VoluntaryExit,
