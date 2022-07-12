@@ -51,12 +51,12 @@ module Classes {
         AttestationData(Slot_default, CommitteeIndex_default, Root_default, Checkpoint_new(), Checkpoint_new())
     }
     datatype IndexedAttestation = IndexedAttestation(
-        attesting_indices: ssz_List<ValidatorIndex>,
+        attesting_indices: seq<ValidatorIndex>,
         data: AttestationData,
         signature: BLSSignature
     )
     function method IndexedAttestation_new(): IndexedAttestation {
-        IndexedAttestation(List_new<ValidatorIndex>([]), AttestationData_new(), BLSSignature_default)
+        IndexedAttestation([], AttestationData_new(), BLSSignature_default)
     }
     datatype PendingAttestation = PendingAttestation(
         aggregation_bits: Bitlist,
@@ -186,18 +186,18 @@ module Classes {
         slot: Slot,
         fork: Fork,
         latest_block_header: BeaconBlockHeader,
-        block_roots: ssz_Vector<Root>,
-        state_roots: ssz_Vector<Root>,
-        historical_roots: ssz_List<Root>,
+        block_roots: seq<Root>,
+        state_roots: seq<Root>,
+        historical_roots: seq<Root>,
         eth1_data: Eth1Data,
-        eth1_data_votes: ssz_List<Eth1Data>,
+        eth1_data_votes: seq<Eth1Data>,
         eth1_deposit_index: uint64,
-        validators: ssz_List<Validator>,
-        balances: ssz_List<Gwei>,
-        randao_mixes: ssz_Vector<Bytes32>,
-        slashings: ssz_Vector<Gwei>,
-        previous_epoch_attestations: ssz_List<PendingAttestation>,
-        current_epoch_attestations: ssz_List<PendingAttestation>,
+        validators: seq<Validator>,
+        balances: seq<Gwei>,
+        randao_mixes: seq<Bytes32>,
+        slashings: seq<Gwei>,
+        previous_epoch_attestations: seq<PendingAttestation>,
+        current_epoch_attestations: seq<PendingAttestation>,
         justification_bits: Bitvector,
         previous_justified_checkpoint: Checkpoint,
         current_justified_checkpoint: Checkpoint,
@@ -208,7 +208,7 @@ module Classes {
         }
     }
     function method BeaconState_new(): BeaconState {
-        BeaconState(0, Root_default, Slot_default, Fork_new(), BeaconBlockHeader_new(), Vector_new<Root>(), Vector_new<Root>(), List_new<Root>([]), Eth1Data_new(), List_new<Eth1Data>([]), 0, List_new<Validator>([]), List_new<Gwei>([]), Vector_new<Bytes32>(), Vector_new<Gwei>(), List_new<PendingAttestation>([]), List_new<PendingAttestation>([]), Bitvector_new(), Checkpoint_new(), Checkpoint_new(), Checkpoint_new())
+        BeaconState(0, Root_default, Slot_default, Fork_new(), BeaconBlockHeader_new(), [], [], [], Eth1Data_new(), [], 0, [], [], [], [], [], [], Bitvector_new(), Checkpoint_new(), Checkpoint_new(), Checkpoint_new())
     }
     datatype SignedVoluntaryExit = SignedVoluntaryExit(
         message: VoluntaryExit,

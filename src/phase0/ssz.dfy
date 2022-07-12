@@ -199,4 +199,11 @@ module SSZ {
     function method Bytes32_new(a: nat): Bytes1
     const Bytes32_default := Bytes32_new(0);
     const boolean_default := 0;
+
+    function method seq_max_f<A,B>(cool: seq<A>, key: (A) -> Outcome<B>): Outcome<A>
+    function method seq_any<T>(coll: seq<T>): bool
+    function method seq_filter<T>(f: (T) -> bool, coll: seq<T>): seq<T>
+    function method seq_to_set<T>(s: seq<T>): set<T>
+    function method set_filter<T>(f: (T) -> bool, coll: set<T>): set<T>
+    function method set_to_seq<T>(s: set<T>): seq<T>
 }
