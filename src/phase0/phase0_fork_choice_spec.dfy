@@ -21,6 +21,7 @@ method state_transition(state: BeaconState, block: SignedBeaconBlock, check: boo
     Return the epoch number at ``slot``.
     */
 function method compute_epoch_at_slot(slot: Slot): Epoch
+requires SLOTS_PER_EPOCH != 0
 {
   Epoch_new(slot / SLOTS_PER_EPOCH)
 }
@@ -66,57 +67,51 @@ function method compute_slots_since_epoch_start(slot: Slot): int
   slot - compute_start_slot_at_epoch(compute_epoch_at_slot(slot))
 }
 
-function method get_ancestor(store: Store, root: Root, slot: Slot): (Status, Root)
+function method get_ancestor(store: Store, root: Root, slot: Slot): Outcome<Root>
 reads store, store.blocks
 {
-  var tmp_0 := store.blocks.get(root);
-  if tmp_0.0.IsFailure() then
-    (Failure, Root_default)
+  var block: BeaconBlock :- store.blocks.get(root);
+  if block.slot > slot then
+    get_ancestor(store, block.parent_root, slot)
   else
-    var block: BeaconBlock := tmp_0.1;
-    if block.slot > slot then
-      get_ancestor(store, block.parent_root, slot)
+    if block.slot == slot then
+      Result(root)
     else
-      if block.slot == slot then
-        (Success, root)
-      else
-        (Success, root)
+      Result(root)
 }
 
-function method get_latest_attesting_balance(store: Store, root: Root): (Status, Gwei) 
+function method get_latest_attesting_balance(store: Store, root: Root): Outcome<Gwei>
 reads store, store.blocks, store.checkpoint_states
 {
-  var tmp_0 := store.checkpoint_states.get(store.justified_checkpoint);
-  if tmp_0.0.IsFailure() then
-    (Failure, Gwei_default)
+  var state: BeaconState :- store.checkpoint_states.get(store.justified_checkpoint);
+  var active_indices: Sequence<ValidatorIndex> := get_active_validator_indices(state, get_current_epoch(state));
+  var tmp_0 :- filter_f((i) =>
+      if store.latest_messages.contains(i) && !store.equivocating_indices.contains(i) then
+        var tmp_0 :- store.latest_messages.get(i);
+        var tmp_1 :- store.blocks.get(root);
+        var tmp_2 :- get_ancestor(store, tmp_0.root, tmp_1.slot);
+        Result(tmp_2 == root)
+      else Result(false),
+    active_indices);
+  var tmp_1 :- pymap_f((i) => var tmp_0 :- state.validators.get(i); Result(tmp_0.effective_balance), tmp_0);
+  var attestation_score: Gwei := Gwei_new(sum(tmp_1));
+  if store.proposer_boost_root == Root_new(0) then
+    Result(attestation_score)
   else
-    var state: BeaconState := tmp_0.1;
-    var active_indices: Sequence<ValidatorIndex> := get_active_validator_indices(state, get_current_epoch(state));
-    // TODO: implement exception handling
-    var attestation_score: Gwei := Gwei_new(sum(pymap((i) => state.validators.get(i).1.effective_balance, filter((i) => store.latest_messages.contains(i) && !store.equivocating_indices.contains(i) && get_ancestor(store, store.latest_messages.get(i).1.root, store.blocks.get(root).1.slot).1 == root, active_indices))));
-    if store.proposer_boost_root == Root_new(0) then
-      (Success, attestation_score)
-    else
-      var proposer_score: Gwei := Gwei_new(0);
-      var tmp_1 := store.blocks.get(root);
-      if tmp_1.0.IsFailure() then
-        (Failure, Gwei_default)
+    var proposer_score: Gwei := Gwei_new(0);
+    var tmp_1 :- store.blocks.get(root);
+    var tmp_2 :- get_ancestor(store, store.proposer_boost_root, tmp_1.slot);
+    var proposer_score_2: Gwei :=
+      if tmp_2 == root then
+        var num_validators: int := len(get_active_validator_indices(state, get_current_epoch(state)));
+        var avg_balance: Gwei := get_total_active_balance(state) / num_validators;
+        var committee_size: uint64 := num_validators / SLOTS_PER_EPOCH;
+        var committee_weight: Gwei := committee_size * avg_balance;
+        var proposer_score_1: Gwei := committee_weight * PROPOSER_SCORE_BOOST / 100;
+        proposer_score_1
       else
-        var tmp_2 := get_ancestor(store, store.proposer_boost_root, tmp_1.1.slot);
-        if tmp_2.0.IsFailure() then
-          (Failure, Gwei_default)
-        else
-          var proposer_score_2: Gwei :=
-            if tmp_2.1 == root then
-              var num_validators: int := len(get_active_validator_indices(state, get_current_epoch(state)));
-              var avg_balance: Gwei := get_total_active_balance(state) / num_validators;
-              var committee_size: uint64 := num_validators / SLOTS_PER_EPOCH;
-              var committee_weight: Gwei := committee_size * avg_balance;
-              var proposer_score_1: Gwei := committee_weight * PROPOSER_SCORE_BOOST / 100;
-              proposer_score_1
-            else
-              proposer_score;
-          (Success, attestation_score + proposer_score_2)
+        proposer_score;
+  Result(attestation_score + proposer_score_2)
 }
 
 method filter_block_tree(store: Store, block_root: Root, blocks: Dict<Root,BeaconBlock>)
@@ -175,7 +170,7 @@ returns (status_: Status, ret_: Root)
     if len(children) == 0 {
       return Success, head_2;
     }
-    var head_1: Root :- a_(max_f(children, (root: Root) => var tmp_0 := get_latest_attesting_balance(store, root); if (tmp_0.0.IsFailure()) then (Failure, (Gwei_default, Root_default)) else (Success, (tmp_0.1, root))));
+    var head_1: Root :- a_(max_f(children, (root: Root) => var tmp_0 :- get_latest_attesting_balance(store, root); Result((tmp_0, root))));
     head_2 := head_1;
   }
 }
@@ -187,20 +182,17 @@ returns (status_: Status, ret_: Root)
 
     See https://ethresear.ch/t/prevention-of-bouncing-attack-on-ffg/6114 for more detailed analysis and discussion.
     */
-function method should_update_justified_checkpoint(store: Store, new_justified_checkpoint: Checkpoint): (Status, bool) 
+function method should_update_justified_checkpoint(store: Store, new_justified_checkpoint: Checkpoint): Outcome<bool>
 {
   if compute_slots_since_epoch_start(get_current_slot(store)) < SAFE_SLOTS_TO_UPDATE_JUSTIFIED then
-    (Success, true)
+    Result(true)
   else
     var justified_slot: Slot := compute_start_slot_at_epoch(store.justified_checkpoint.epoch);
-    var tmp_0 := get_ancestor(store, new_justified_checkpoint.root, justified_slot);
-    if tmp_0.0.IsFailure() then
-      (Failure, false)
+    var tmp_0 :- get_ancestor(store, new_justified_checkpoint.root, justified_slot);
+    if !(tmp_0 == store.justified_checkpoint.root) then
+      Result(false)
     else
-      if !(tmp_0.1 == store.justified_checkpoint.root) then
-        (Success, false)
-      else
-        (Success, true)
+      Result(true)
 }
 
 method validate_target_epoch_against_current_time(store: Store, attestation: Attestation)

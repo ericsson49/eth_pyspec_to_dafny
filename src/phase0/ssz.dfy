@@ -10,31 +10,50 @@ module SSZ {
             Failure
         }
     }
-    method a_<T>(r: (Status, T)) returns (status_: Status, ret_: T) {
-        ret_ :- r.0, r.1;
+    
+    function method a_<T>(r: Outcome<T>): COutcome<T>
+    {
+        if r.IsFailure() then
+            CException
+        else
+            CResult(r.Extract())
     }
 
-    datatype FStatus<T> =
-    | FSuccess(value: T)
-    | FFailure
+    /*method a_<T>(r: (Status, T)) returns (status_: Status, ret_: T) {
+        ret_ :- r.0, r.1;
+    }*/
+
+    datatype Outcome<T> =
+    | Result(value: T)
+    | Exception
     {
-        predicate method IsFailure() { this.FFailure?  }
+        predicate method IsFailure() { this.Exception?  }
         function method Extract(): T
             requires !IsFailure()
         {
             this.value
         }
-        function method PropagateFailure(): FStatus<T>
+        function method PropagateFailure<U>(): Outcome<U>
             requires IsFailure()
         {
-            FFailure
+            Exception
         }
     }
-    method b_<T>(f: FStatus<T>, default: T) returns (status_: Status, ret_: T) {
-        if f.IsFailure() {
-            return Failure, default;
-        } else {
-            return Success, f.Extract();
+
+    datatype COutcome<T> =
+    | CResult(value: T)
+    | CException
+    {
+        predicate method IsFailure() { this.CException?  }
+        function method Extract(): T
+            requires !IsFailure()
+        {
+            this.value
+        }
+        function method PropagateFailure(): Status
+            requires IsFailure()
+        {
+            Failure
         }
     }
 
@@ -58,11 +77,12 @@ module SSZ {
         function method contains(k: T): bool reads this
     }
     trait Sequence<T> extends Collection<T> {
-        function method get(k: nat): (Status, T)
+        function method get(k: nat): Outcome<T>
         function method get_nf(i: nat): T
     }
     class Dict<K(==),V> {
         var repr: map<K,V>;
+        constructor empty()
         function values(): set<V> reads this {
             repr.Values
         }
@@ -75,18 +95,25 @@ module SSZ {
         {
             k in repr
         }
-        function method get(k: K): (Status, V) reads this
+        function method get_s(k: K): (Status, V) reads this
+        ensures !get_s(k).0.IsFailure() <==> k in repr
+        ensures !get_s(k).0.IsFailure() ==> get_s(k).1 == repr[k]
         function method get_nf(k: K): V reads this requires contains(k) {
             repr[k]
         }
-        method set_value(k: K, v: V) modifies this {
+        function method get(k: K): Outcome<V> reads this
+        ensures !get(k).IsFailure() <==> k in repr
+        ensures !get(k).IsFailure() ==> get(k).Extract() == repr[k]
+        method set_value(k: K, v: V) modifies this
+        ensures old(repr)[k := v] == repr
+        {
             repr := repr[k := v];
         }
     }
     class Set<T(==)> extends Collection<T> {
         var repr: set<T>
         constructor empty() {}
-        constructor(t: seq<T>) {}
+        constructor(t: set<T>) {}
         function method contains(k: T): bool reads this
         function method intersection(s: Sequence<T>): Set<T>
         method add(e: T) modifies this
@@ -96,18 +123,18 @@ module SSZ {
         constructor empty() {}
         constructor(t: seq<T>) {}
         function method contains(k: T): bool reads this
-        function method get(k: nat): (Status, T)
+        function method get(k: nat): Outcome<T>
         function method get_nf(i: nat): T
         method append(e: T) modifies this
     }
     class ssz_List<T> extends Sequence<T> {
         function method contains(k: T): bool reads this
-        function method get(k: nat): (Status, T)
+        function method get(k: nat): Outcome<T>
         function method get_nf(i: nat): T
     }
     class ssz_Vector<T> extends Sequence<T> {
         function method contains(k: T): bool reads this
-        function method get(k: nat): (Status, T)
+        function method get(k: nat): Outcome<T>
         function method get_nf(i: nat): T
     }
     type Bitlist = ssz_List<boolean>
@@ -139,6 +166,13 @@ module SSZ {
       if b then Success else Failure
     }
 
+    function method pyassert_(b: bool): Outcome<()>
+    ensures b <==> pyassert_(b).Result?
+    ensures !b <==> pyassert_(b).Exception?
+    {
+      if b then Result(()) else Exception
+    }
+
     function method Bitlist_new(a: seq<bool>): Bitlist
     function method Bitvector_new(): Bitvector
     method Dict_new<K,V>(a: map<K,V>) returns (ret_: Dict<K,V>) ensures ret_.repr == a && fresh(ret_)
@@ -160,9 +194,10 @@ module SSZ {
     function method all<T>(s: Sequence<T>): bool
 
     function method filter<T>(f: (T) -> bool, s: Collection<T>): Sequence<T>
-    function method filter_f<T>(f: (T) -> (Status, bool), s: Collection<T>): (Status, Sequence<T>)
+    function method filter_f<T>(f: (T) -> Outcome<bool>, s: Collection<T>): Outcome<Sequence<T>>
     function method pymap<A,B>(f: (A) -> B, s: Collection<A>): Sequence<B>
-    function method max_f<A,B>(a: Collection<A>, key: (A) -> (Status, B)): (Status, A)
+    function method pymap_f<A,B>(f: (A) -> Outcome<B>, s: Collection<A>): Outcome<Sequence<B>>
+    function method max_f<A,B>(a: Collection<A>, key: (A) ~> Outcome<B>): Outcome<A>
     function method sum(a: Collection<nat>): nat
 
     function method pow(a: nat, b: nat): nat

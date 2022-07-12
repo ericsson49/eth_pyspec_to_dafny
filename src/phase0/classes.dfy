@@ -322,19 +322,19 @@ module Classes {
     datatype LatestMessage = LatestMessage(epoch: Epoch, root: Root)
     function method LatestMessage_new(): LatestMessage
     class Store {
-    // constructor() {
-    //     time := 0;
-    //     genesis_time := 0;
-    //     justified_checkpoint := Checkpoint_new();
-    //     finalized_checkpoint := Checkpoint_new();
-    //     best_justified_checkpoint := Checkpoint_new();
-    //     proposer_boost_root := Root_default;
-    //     equivocating_indices := Set_new({});
-    //     blocks := Dict_new<Root,BeaconBlock>(map[]);
-    //     block_states := Dict_new<Root,BeaconState>(map[]);
-    //     checkpoint_states := Dict_new<Checkpoint,BeaconState>(map[]);
-    //     latest_messages := Dict_new<ValidatorIndex,LatestMessage>(map[]);
-    // }
+    constructor empty() {
+        time := 0;
+        genesis_time := 0;
+        justified_checkpoint := Checkpoint_new();
+        finalized_checkpoint := Checkpoint_new();
+        best_justified_checkpoint := Checkpoint_new();
+        proposer_boost_root := Root_default;
+        equivocating_indices := new Set.empty();
+        blocks := new Dict.empty();
+        block_states := new Dict.empty();
+        checkpoint_states := new Dict.empty();
+        latest_messages := new Dict.empty();
+    }
     constructor Init(time: uint64, genesis_time: uint64, justified_checkpoint: Checkpoint, finalized_checkpoint: Checkpoint, best_justified_checkpoint: Checkpoint, proposer_boost_root: Root, equivocating_indices: Set<ValidatorIndex>, blocks: Dict<Root,BeaconBlock>, block_states: Dict<Root,BeaconState>, checkpoint_states: Dict<Checkpoint,BeaconState>, latest_messages: Dict<ValidatorIndex,LatestMessage>)
     ensures this.time == time && this.genesis_time == genesis_time && this.justified_checkpoint == justified_checkpoint
     && this.finalized_checkpoint == finalized_checkpoint && this.best_justified_checkpoint == best_justified_checkpoint

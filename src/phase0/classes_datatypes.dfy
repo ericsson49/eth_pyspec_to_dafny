@@ -27,25 +27,18 @@ module Classes {
     function method Checkpoint_new(): Checkpoint {
         Checkpoint(Epoch_default, Root_default)
     }
-    class Validator {
-    constructor() {
-        pubkey := BLSPubkey_default;
-        withdrawal_credentials := Bytes32_default;
-        effective_balance := Gwei_default;
-        slashed := boolean_default;
-        activation_eligibility_epoch := Epoch_default;
-        activation_epoch := Epoch_default;
-        exit_epoch := Epoch_default;
-        withdrawable_epoch := Epoch_default;
-    }
-    const pubkey: BLSPubkey;
-    const withdrawal_credentials: Bytes32;
-    var effective_balance: Gwei;
-    var slashed: boolean;
-    var activation_eligibility_epoch: Epoch;
-    var activation_epoch: Epoch;
-    var exit_epoch: Epoch;
-    var withdrawable_epoch: Epoch;
+    datatype Validator = Validator(
+        pubkey: BLSPubkey,
+        withdrawal_credentials: Bytes32,
+        effective_balance: Gwei,
+        slashed: boolean,
+        activation_eligibility_epoch: Epoch,
+        activation_epoch: Epoch,
+        exit_epoch: Epoch,
+        withdrawable_epoch: Epoch
+    )
+    function method Validator_new(): Validator {
+        Validator(BLSPubkey_default, Bytes32_default, Gwei_default, boolean_default, Epoch_default, Epoch_default, Epoch_default, Epoch_default)
     }
     datatype AttestationData = AttestationData(
         slot: Slot,
@@ -180,57 +173,42 @@ module Classes {
         body: BeaconBlockBody
     )
     {
-        function method copy(): BeaconBlock
+        function method copy(): BeaconBlock {
+            this
+        }
     }
     function method BeaconBlock_new(): BeaconBlock{
         BeaconBlock(Slot_default, ValidatorIndex_default, Root_default, Root_default, BeaconBlockBody_new())
     }
-    class BeaconState {
-    constructor() {
-        genesis_time := 0;
-        genesis_validators_root := Root_default;
-        slot := Slot_default;
-        fork := Fork_new();
-        latest_block_header := BeaconBlockHeader_new();
-        block_roots := Vector_new<Root>();
-        state_roots := Vector_new<Root>();
-        historical_roots := List_new<Root>([]);
-        eth1_data := Eth1Data_new();
-        eth1_data_votes := List_new<Eth1Data>([]);
-        eth1_deposit_index := 0;
-        validators := List_new<Validator>([]);
-        balances := List_new<Gwei>([]);
-        randao_mixes := Vector_new<Bytes32>();
-        slashings := Vector_new<Gwei>();
-        previous_epoch_attestations := List_new<PendingAttestation>([]);
-        current_epoch_attestations := List_new<PendingAttestation>([]);
-        justification_bits := Bitvector_new();
-        previous_justified_checkpoint := Checkpoint_new();
-        current_justified_checkpoint := Checkpoint_new();
-        finalized_checkpoint := Checkpoint_new();
+    datatype BeaconState = BeaconState(
+        genesis_time: uint64,
+        genesis_validators_root: Root,
+        slot: Slot,
+        fork: Fork,
+        latest_block_header: BeaconBlockHeader,
+        block_roots: ssz_Vector<Root>,
+        state_roots: ssz_Vector<Root>,
+        historical_roots: ssz_List<Root>,
+        eth1_data: Eth1Data,
+        eth1_data_votes: ssz_List<Eth1Data>,
+        eth1_deposit_index: uint64,
+        validators: ssz_List<Validator>,
+        balances: ssz_List<Gwei>,
+        randao_mixes: ssz_Vector<Bytes32>,
+        slashings: ssz_Vector<Gwei>,
+        previous_epoch_attestations: ssz_List<PendingAttestation>,
+        current_epoch_attestations: ssz_List<PendingAttestation>,
+        justification_bits: Bitvector,
+        previous_justified_checkpoint: Checkpoint,
+        current_justified_checkpoint: Checkpoint,
+        finalized_checkpoint: Checkpoint
+    ) {
+        function method copy(): BeaconState {
+            this
+        }
     }
-    var genesis_time: uint64;
-    var genesis_validators_root: Root;
-    var slot: Slot;
-    var fork: Fork;
-    var latest_block_header: BeaconBlockHeader;
-    var block_roots: ssz_Vector<Root>;
-    var state_roots: ssz_Vector<Root>;
-    var historical_roots: ssz_List<Root>;
-    var eth1_data: Eth1Data;
-    var eth1_data_votes: ssz_List<Eth1Data>;
-    var eth1_deposit_index: uint64;
-    var validators: ssz_List<Validator>;
-    var balances: ssz_List<Gwei>;
-    var randao_mixes: ssz_Vector<Bytes32>;
-    var slashings: ssz_Vector<Gwei>;
-    var previous_epoch_attestations: ssz_List<PendingAttestation>;
-    var current_epoch_attestations: ssz_List<PendingAttestation>;
-    var justification_bits: Bitvector;
-    var previous_justified_checkpoint: Checkpoint;
-    var current_justified_checkpoint: Checkpoint;
-    var finalized_checkpoint: Checkpoint;
-    function method copy(): BeaconState
+    function method BeaconState_new(): BeaconState {
+        BeaconState(0, Root_default, Slot_default, Fork_new(), BeaconBlockHeader_new(), Vector_new<Root>(), Vector_new<Root>(), List_new<Root>([]), Eth1Data_new(), List_new<Eth1Data>([]), 0, List_new<Validator>([]), List_new<Gwei>([]), Vector_new<Bytes32>(), Vector_new<Gwei>(), List_new<PendingAttestation>([]), List_new<PendingAttestation>([]), Bitvector_new(), Checkpoint_new(), Checkpoint_new(), Checkpoint_new())
     }
     datatype SignedVoluntaryExit = SignedVoluntaryExit(
         message: VoluntaryExit,
@@ -279,42 +257,88 @@ module Classes {
     datatype LatestMessage = LatestMessage(epoch: Epoch, root: Root)
     function method LatestMessage_new(): LatestMessage
     class Store {
-        constructor() {
-            time := 0;
-            genesis_time := 0;
-            justified_checkpoint := Checkpoint_new();
-            finalized_checkpoint := Checkpoint_new();
-            best_justified_checkpoint := Checkpoint_new();
-            proposer_boost_root := Root_default;
-            equivocating_indices := Set_new([]);
-            blocks := Dict_new<Root,BeaconBlock>([]);
-            block_states := Dict_new<Root,BeaconState>([]);
-            checkpoint_states := Dict_new<Checkpoint,BeaconState>([]);
-            latest_messages := Dict_new<ValidatorIndex,LatestMessage>([]);
+    constructor empty() {
+        time := 0;
+        genesis_time := 0;
+        justified_checkpoint := Checkpoint_new();
+        finalized_checkpoint := Checkpoint_new();
+        best_justified_checkpoint := Checkpoint_new();
+        proposer_boost_root := Root_default;
+        equivocating_indices := new Set.empty();
+        blocks := new Dict.empty();
+        block_states := new Dict.empty();
+        checkpoint_states := new Dict.empty();
+        latest_messages := new Dict.empty();
+    }
+    constructor Init(time: uint64, genesis_time: uint64, justified_checkpoint: Checkpoint, finalized_checkpoint: Checkpoint, best_justified_checkpoint: Checkpoint, proposer_boost_root: Root, equivocating_indices: Set<ValidatorIndex>, blocks: Dict<Root,BeaconBlock>, block_states: Dict<Root,BeaconState>, checkpoint_states: Dict<Checkpoint,BeaconState>, latest_messages: Dict<ValidatorIndex,LatestMessage>)
+    ensures this.time == time && this.genesis_time == genesis_time && this.justified_checkpoint == justified_checkpoint
+    && this.finalized_checkpoint == finalized_checkpoint && this.best_justified_checkpoint == best_justified_checkpoint
+    && this.proposer_boost_root == proposer_boost_root && this.equivocating_indices == equivocating_indices
+    && this.blocks == blocks && this.block_states == block_states && this.checkpoint_states == checkpoint_states
+    && this.latest_messages == latest_messages
+    {
+        this.time := time;
+        this.genesis_time := genesis_time;
+        this.justified_checkpoint := justified_checkpoint;
+        this.finalized_checkpoint := finalized_checkpoint;
+        this.best_justified_checkpoint := best_justified_checkpoint;
+        this.proposer_boost_root := proposer_boost_root;
+        this.equivocating_indices := equivocating_indices;
+        this.blocks := blocks;
+        this.block_states := block_states;
+        this.checkpoint_states := checkpoint_states;
+        this.latest_messages := latest_messages;
+    }
+    var time: uint64;
+    var genesis_time: uint64;
+    var justified_checkpoint: Checkpoint;
+    var finalized_checkpoint: Checkpoint;
+    var best_justified_checkpoint: Checkpoint;
+    var proposer_boost_root: Root;
+    var equivocating_indices: Set<ValidatorIndex>;
+    var blocks: Dict<Root,BeaconBlock>;
+    var block_states: Dict<Root,BeaconState>;
+    var checkpoint_states: Dict<Checkpoint,BeaconState>;
+    var latest_messages: Dict<ValidatorIndex,LatestMessage>;
+    function method toPure(): Store_dt
+    reads this, this.equivocating_indices, this.blocks, this.block_states, this.checkpoint_states, this.latest_messages
+    {
+        Store_dt(
+            time, genesis_time, justified_checkpoint, finalized_checkpoint,
+            best_justified_checkpoint, proposer_boost_root, equivocating_indices.repr,
+            blocks.repr, block_states.repr, checkpoint_states.repr, latest_messages.repr
+        )
+    }
+    }
+    datatype Store_dt = Store_dt(
+        time: uint64,
+        genesis_time: uint64,
+        justified_checkpoint: Checkpoint,
+        finalized_checkpoint: Checkpoint,
+        best_justified_checkpoint: Checkpoint,
+        proposer_boost_root: Root,
+        equivocating_indices: set<ValidatorIndex>,
+        blocks: map<Root,BeaconBlock>,
+        block_states: map<Root,BeaconState>,
+        checkpoint_states: map<Checkpoint,BeaconState>,
+        latest_messages: map<ValidatorIndex,LatestMessage>
+    ) {
+        method toImpure() returns (ret_: Store)
+        ensures ret_.toPure() == this
+        ensures fresh(ret_) && fresh(ret_.blocks) && fresh(ret_.block_states)
+        && fresh(ret_.checkpoint_states) && fresh(ret_.latest_messages)
+        && fresh(ret_.equivocating_indices)
+        {
+            var equivocating_indices := Set_new(equivocating_indices);
+            var blocks := Dict_new(blocks);
+            var block_states := Dict_new(block_states);
+            var checkpoint_states := Dict_new(checkpoint_states);
+            var latest_messages := Dict_new(latest_messages);
+            ret_ := new Store.Init(
+                time, genesis_time, justified_checkpoint, finalized_checkpoint,
+                best_justified_checkpoint, proposer_boost_root, equivocating_indices,
+                blocks, block_states, checkpoint_states, latest_messages
+            );
         }
-        constructor Init(time: uint64, genesis_time: uint64, justified_checkpoint: Checkpoint, finalized_checkpoint: Checkpoint, best_justified_checkpoint: Checkpoint, proposer_boost_root: Root, equivocating_indices: Set<ValidatorIndex>, blocks: Dict<Root,BeaconBlock>, block_states: Dict<Root,BeaconState>, checkpoint_states: Dict<Checkpoint,BeaconState>, latest_messages: Dict<ValidatorIndex,LatestMessage>) {
-            this.time := time;
-            this.genesis_time := genesis_time;
-            this.justified_checkpoint := justified_checkpoint;
-            this.finalized_checkpoint := finalized_checkpoint;
-            this.best_justified_checkpoint := best_justified_checkpoint;
-            this.proposer_boost_root := proposer_boost_root;
-            this.equivocating_indices := equivocating_indices;
-            this.blocks := blocks;
-            this.block_states := block_states;
-            this.checkpoint_states := checkpoint_states;
-            this.latest_messages := latest_messages;
-        }
-        var time: uint64;
-        const genesis_time: uint64;
-        var justified_checkpoint: Checkpoint;
-        var finalized_checkpoint: Checkpoint;
-        var best_justified_checkpoint: Checkpoint;
-        var proposer_boost_root: Root;
-        const equivocating_indices: Set<ValidatorIndex>;
-        var blocks: Dict<Root,BeaconBlock>;
-        var block_states: Dict<Root,BeaconState>;
-        var checkpoint_states: Dict<Checkpoint,BeaconState>;
-        const latest_messages: Dict<ValidatorIndex,LatestMessage>;
     }
 }
