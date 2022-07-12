@@ -203,6 +203,9 @@ module SSZ {
     function method seq_max_f<A,B>(cool: seq<A>, key: (A) -> Outcome<B>): Outcome<A>
     function method seq_any<T>(coll: seq<T>): bool
     function method seq_filter<T>(f: (T) -> bool, coll: seq<T>): seq<T>
+    function method seq_filter_f<T>(f: (T) -> Outcome<bool>, s: seq<T>): Outcome<seq<T>>
+    function method seq_map_f<A,B>(f: (A) -> Outcome<B>, s: seq<A>): Outcome<seq<B>>
+    function method seq_sum(a: seq<nat>): nat
     function method seq_to_set<T>(s: seq<T>): set<T>
 
     function method set_filter<T>(f: (T) -> bool, coll: set<T>): set<T>

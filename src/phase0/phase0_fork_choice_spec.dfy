@@ -12,7 +12,7 @@ function method get_current_epoch(state: BeaconState): Epoch
 function method is_slashable_attestation_data(data1: AttestationData, data2: AttestationData): bool
 function method is_valid_indexed_attestation(state: BeaconState, attestation: IndexedAttestation): bool
 function method get_indexed_attestation(state: BeaconState, attestation: Attestation): IndexedAttestation
-function method get_active_validator_indices(state: BeaconState, epoch: Epoch): Sequence<ValidatorIndex>
+function method get_active_validator_indices(state: BeaconState, epoch: Epoch): seq<ValidatorIndex>
 function method get_total_active_balance(state: BeaconState): Gwei
 method process_slots(state_: BeaconState, slot: Slot) returns (status_: Outcome<()>, state: BeaconState)
 method state_transition(state_: BeaconState, block: SignedBeaconBlock, check: bool) returns (status_: Outcome<()>, state: BeaconState)
@@ -76,8 +76,8 @@ function method get_ancestor(store: Store_dt, root: Root, slot: Slot): Outcome<R
 function method get_latest_attesting_balance(store: Store_dt, root: Root): Outcome<Gwei>
 {
   var state: BeaconState :- map_get(store.checkpoint_states, store.justified_checkpoint);
-  var active_indices: Sequence<ValidatorIndex> := get_active_validator_indices(state, get_current_epoch(state));
-  var tmp_0 :- filter_f((i) =>
+  var active_indices: seq<ValidatorIndex> := get_active_validator_indices(state, get_current_epoch(state));
+  var tmp_0 :- seq_filter_f((i) =>
       if i in store.latest_messages && i !in store.equivocating_indices then
         var tmp_0 :- map_get(store.latest_messages, i);
         var tmp_1 :- map_get(store.blocks, root);
@@ -85,8 +85,8 @@ function method get_latest_attesting_balance(store: Store_dt, root: Root): Outco
         Result(tmp_2 == root)
       else Result(false),
     active_indices);
-  var tmp_1 :- pymap_f((i) => var tmp_0 :- seq_get(state.validators, i); Result(tmp_0.effective_balance), tmp_0);
-  var attestation_score: Gwei := Gwei_new(sum(tmp_1));
+  var tmp_1 :- seq_map_f((i) => var tmp_0 :- seq_get(state.validators, i); Result(tmp_0.effective_balance), tmp_0);
+  var attestation_score: Gwei := Gwei_new(seq_sum(tmp_1));
   if store.proposer_boost_root == Root_new(0) then
     Result(attestation_score)
   else
@@ -95,7 +95,7 @@ function method get_latest_attesting_balance(store: Store_dt, root: Root): Outco
     var tmp_2 :- get_ancestor(store, store.proposer_boost_root, tmp_1.slot);
     var proposer_score_2: Gwei :=
       if tmp_2 == root then
-        var num_validators: int := len(get_active_validator_indices(state, get_current_epoch(state)));
+        var num_validators: int := |get_active_validator_indices(state, get_current_epoch(state))|;
         var avg_balance: Gwei := get_total_active_balance(state) / num_validators;
         var committee_size: uint64 := num_validators / SLOTS_PER_EPOCH;
         var committee_weight: Gwei := committee_size * avg_balance;
