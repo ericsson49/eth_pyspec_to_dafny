@@ -14,8 +14,8 @@ function method is_valid_indexed_attestation(state: BeaconState, attestation: In
 function method get_indexed_attestation(state: BeaconState, attestation: Attestation): IndexedAttestation
 function method get_active_validator_indices(state: BeaconState, epoch: Epoch): Sequence<ValidatorIndex>
 function method get_total_active_balance(state: BeaconState): Gwei
-method process_slots(state: BeaconState, slot: Slot) returns (status_: Outcome<BeaconState>)
-method state_transition(state: BeaconState, block: SignedBeaconBlock, check: bool) returns (status_: Outcome<BeaconState>)
+method process_slots(state_: BeaconState, slot: Slot) returns (status_: Outcome<()>, state: BeaconState)
+method state_transition(state_: BeaconState, block: SignedBeaconBlock, check: bool) returns (status_: Outcome<()>, state: BeaconState)
 
 /*
     Return the epoch number at ``slot``.
@@ -60,9 +60,6 @@ function method compute_slots_since_epoch_start(slot: Slot): int
 {
   slot - compute_start_slot_at_epoch(compute_epoch_at_slot(slot))
 }
-
-function method seq_get<T>(s: seq<T>, i: nat): Outcome<T>
-function method map_get<K,V>(s: map<K,V>, k: K): Outcome<V>
 
 function method get_ancestor(store: Store_dt, root: Root, slot: Slot): Outcome<Root>
 {
@@ -221,12 +218,13 @@ function method validate_on_attestation(store: Store_dt, attestation: Attestatio
 method store_target_checkpoint_state(store_: Store_dt, target: Checkpoint)
 returns (status_: Outcome<()>, store: Store_dt) 
 {
+  var unused_: ();
   status_, store := Result(()), store_;
   if target !in store.checkpoint_states {
     var tmp_0 :- map_get(store.block_states, target.root);
     var base_state: BeaconState := tmp_0.copy();
     if base_state.slot < compute_start_slot_at_epoch(target.epoch) {
-      base_state :- process_slots(base_state, compute_start_slot_at_epoch(target.epoch));
+      unused_, base_state :- process_slots(base_state, compute_start_slot_at_epoch(target.epoch));
     }
     store := store.(checkpoint_states := store.checkpoint_states[target := base_state]);
   }
@@ -274,6 +272,7 @@ returns (status_: Outcome<()>, store: Store_dt)
 method on_block(store_: Store_dt, signed_block: SignedBeaconBlock)
 returns (status_: Outcome<()>, store: Store_dt) 
 {
+  var unused_: ();
   status_, store := Result(()), store_;
   var block: BeaconBlock := signed_block.message;
   var _ :- pyassert(block.parent_root in store.block_states);
@@ -285,7 +284,7 @@ returns (status_: Outcome<()>, store: Store_dt)
   var tmp_1 :- get_ancestor(store, block.parent_root, finalized_slot);
   var _ :- pyassert(tmp_1 == store.finalized_checkpoint.root);
   var state: BeaconState := pre_state.copy();
-  var _ :- state_transition(state, signed_block, true);
+  unused_, state :- state_transition(state, signed_block, true);
   store := store.(blocks := store.blocks[hash_tree_root(block) := block]);
   store := store.(block_states := store.block_states[hash_tree_root(block) := state]);
   var time_into_slot: uint64 := (store.time - store.genesis_time) % SECONDS_PER_SLOT;
@@ -317,10 +316,10 @@ returns (status_: Outcome<()>, store: Store_dt)
 method on_attestation(store_: Store_dt, attestation: Attestation, is_from_block: bool)
 returns (status_: Outcome<()>, store: Store_dt) 
 {
+  var unused_: ();
   status_, store := Result(()), store_;
   var _ :- validate_on_attestation(store, attestation, is_from_block);
-  var tmp_0;
-  tmp_0, store :- store_target_checkpoint_state(store, attestation.data.target);
+  unused_, store :- store_target_checkpoint_state(store, attestation.data.target);
   var target_state: BeaconState :- map_get(store.checkpoint_states, attestation.data.target);
   var indexed_attestation: IndexedAttestation := get_indexed_attestation(target_state, attestation);
   var _ :- pyassert(is_valid_indexed_attestation(target_state, indexed_attestation));
