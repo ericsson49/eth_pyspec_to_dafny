@@ -119,7 +119,8 @@ returns (status_: Outcome<bool>, blocks: map<Root, BeaconBlock>)
     while tmp_0 != [] decreases tmp_0 {
       var child := tmp_0[0];
       tmp_0 := tmp_0[1..];
-      var tmp_2, ret_ :- filter_block_tree(store, child, blocks);
+      var tmp_2;
+      tmp_2, blocks :- filter_block_tree(store, child, blocks);
       tmp_1 := tmp_1 + [tmp_2];
     }
     var filter_block_tree_result: seq<bool> := tmp_1;
