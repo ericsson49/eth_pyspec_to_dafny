@@ -14,8 +14,8 @@ function method is_valid_indexed_attestation(state: BeaconState, attestation: In
 function method get_indexed_attestation(state: BeaconState, attestation: Attestation): IndexedAttestation
 function method get_active_validator_indices(state: BeaconState, epoch: Epoch): seq<ValidatorIndex>
 function method get_total_active_balance(state: BeaconState): Gwei
-method process_slots(state_: BeaconState, slot: Slot) returns (status_: Outcome<()>, state: BeaconState)
-method state_transition(state_: BeaconState, block: SignedBeaconBlock, check: bool) returns (status_: Outcome<()>, state: BeaconState)
+function method process_slots(state_: BeaconState, slot: Slot): Outcome<BeaconState>
+function method state_transition(state_: BeaconState, block: SignedBeaconBlock, check: bool): Outcome<BeaconState>
 
 /*
     Return the epoch number at ``slot``.
@@ -34,8 +34,7 @@ function method compute_start_slot_at_epoch(epoch: Epoch): Slot
   Slot_new(epoch * SLOTS_PER_EPOCH)
 }
 
-method get_forkchoice_store(anchor_state: BeaconState, anchor_block: BeaconBlock)
-returns (status_: Outcome<Store_dt>)
+function method get_forkchoice_store(anchor_state: BeaconState, anchor_block: BeaconBlock): Outcome<Store_dt>
 {
   var _ :- pyassert(anchor_block.state_root == hash_tree_root(anchor_state));
   var anchor_root: Root := Root_new(hash_tree_root(anchor_block));
@@ -43,7 +42,7 @@ returns (status_: Outcome<Store_dt>)
   var justified_checkpoint: Checkpoint := Checkpoint(anchor_epoch, anchor_root);
   var finalized_checkpoint: Checkpoint := Checkpoint(anchor_epoch, anchor_root);
   var proposer_boost_root: Root := Root_new(0);
-  return Result(Store_dt(uint64_new(anchor_state.genesis_time + (SECONDS_PER_SLOT * anchor_state.slot)), anchor_state.genesis_time, justified_checkpoint, finalized_checkpoint, justified_checkpoint, proposer_boost_root, {}, map[anchor_root := anchor_block.copy()], map[anchor_root := anchor_state.copy()], map[justified_checkpoint := anchor_state.copy()], map[]));
+  Result(Store_dt(uint64_new(anchor_state.genesis_time + (SECONDS_PER_SLOT * anchor_state.slot)), anchor_state.genesis_time, justified_checkpoint, finalized_checkpoint, justified_checkpoint, proposer_boost_root, {}, map[anchor_root := anchor_block.copy()], map[anchor_root := anchor_state.copy()], map[justified_checkpoint := anchor_state.copy()], map[]))
 }
 
 function method get_slots_since_genesis(store: Store_dt): int
@@ -106,67 +105,61 @@ function method get_latest_attesting_balance(store: Store_dt, root: Root): Outco
   Result(attestation_score + proposer_score_2)
 }
 
-method filter_block_tree(store: Store_dt, block_root: Root, blocks_: map<Root,BeaconBlock>)
-returns (status_: Outcome<bool>, blocks: map<Root, BeaconBlock>)
+function method filter_block_tree(store: Store_dt, block_root: Root, blocks: map<Root,BeaconBlock>): Outcome<(bool, map<Root, BeaconBlock>)>
 {
-  blocks := blocks_;
   var block: BeaconBlock :- map_get(store.blocks, block_root);
   var tmp_0 := store.blocks.Keys;
-  var children: seq<Root> := set_to_seq(set_filter((root) => store.blocks[root].parent_root == block_root, tmp_0));
-  if seq_any(children) {
-    var tmp_0 := children;
-    var tmp_1 := [];
-    while tmp_0 != [] decreases tmp_0 {
-      var child := tmp_0[0];
-      tmp_0 := tmp_0[1..];
-      var tmp_2;
-      tmp_2, blocks :- filter_block_tree(store, child, blocks);
-      tmp_1 := tmp_1 + [tmp_2];
-    }
-    var filter_block_tree_result: seq<bool> := tmp_1;
-    if seq_any(filter_block_tree_result) {
-      blocks := blocks[block_root := block];
-      return Result(true), blocks;
-    }
-    return Result(false), blocks;
-  }
-  var head_state: BeaconState :- map_get(store.block_states, block_root);
-  var correct_justified: bool := store.justified_checkpoint.epoch == GENESIS_EPOCH || head_state.current_justified_checkpoint == store.justified_checkpoint;
-  var correct_finalized: bool := store.finalized_checkpoint.epoch == GENESIS_EPOCH || head_state.finalized_checkpoint == store.finalized_checkpoint;
-  if correct_justified && correct_finalized {
-    blocks := blocks[block_root := block];
-    return Result(true), blocks;
-  }
-  return Result(false), blocks;
+  var tmp_1 :- set_filter_f((root) => var tmp_0 :- map_get(store.blocks, root); Result(tmp_0.parent_root == block_root), tmp_0);
+  var children: seq<Root> := set_to_seq(tmp_1);
+  if seq_any(children) then
+    var loop_body := (x: (seq<bool>, map<Root, BeaconBlock>), child: Root) =>
+      var (tmp_1: seq<bool>, blocks: map<Root, BeaconBlock>) := x;
+      var (tmp_2, blocks) :- filter_block_tree(store, child, blocks);
+      Result(((tmp_1 + [tmp_2]), blocks));
+    var (filter_block_tree_result: seq<bool>, blocks) :- seq_loop_f(children, ([], blocks), loop_body);
+    if seq_any(filter_block_tree_result) then
+      var blocks := blocks[block_root := block];
+      Result((true, blocks))
+    else
+      Result((false, blocks))
+  else
+    var head_state: BeaconState :- map_get(store.block_states, block_root);
+    var correct_justified: bool := store.justified_checkpoint.epoch == GENESIS_EPOCH || head_state.current_justified_checkpoint == store.justified_checkpoint;
+    var correct_finalized: bool := store.finalized_checkpoint.epoch == GENESIS_EPOCH || head_state.finalized_checkpoint == store.finalized_checkpoint;
+    if correct_justified && correct_finalized then
+      var blocks := blocks[block_root := block];
+      Result((true, blocks))
+    else
+      Result((false, blocks))
 }
 
 /*
     Retrieve a filtered block tree from ``store``, only returning branches
     whose leaf state's justified/finalized info agrees with that in ``store``.
     */
-method get_filtered_block_tree(store: Store_dt) returns (status_: Outcome<map<Root,BeaconBlock>>)
+function method get_filtered_block_tree(store: Store_dt): Outcome<map<Root,BeaconBlock>>
 {
   var base: Root := store.justified_checkpoint.root;
   var blocks: map<Root,BeaconBlock> := map[];
-  var tmp_0;
-  tmp_0, blocks := filter_block_tree(store, base, blocks);
-  return Result(blocks);
+  var (_, blocks) :- filter_block_tree(store, base, blocks);
+  Result(blocks)
 }
 
-method get_head(store: Store_dt) returns (status_: Outcome<Root>)
+function method get_head(store: Store_dt): Outcome<Root>
 {
   var blocks: map<Root,BeaconBlock> :- get_filtered_block_tree(store);
   var head: Root := store.justified_checkpoint.root;
   var head_2 := head;
-  while true {
+  var loop_body := (head_2: Root, fixpoint: (Root) -> Outcome<Root>) =>
     var tmp_0 := blocks.Keys;
-    var children: seq<Root> := set_to_seq(set_filter((root) => blocks[root].parent_root == head_2, tmp_0));
-    if |children| == 0 {
-      return Result(head_2);
-    }
-    var head_1: Root :- seq_max_f(children, (root: Root) => var tmp_0 :- get_latest_attesting_balance(store, root); Result((tmp_0, root)));
-    head_2 := head_1;
-  }
+    var tmp_1 :- set_filter_f((root: Root) => var tmp_0 :- map_get(blocks, root); Result(tmp_0.parent_root == head_2), tmp_0);
+    var children: seq<Root> := set_to_seq(tmp_1);
+    if |children| == 0 then
+      Result(head_2)
+    else
+      var head_1: Root :- seq_max_f(children, (root: Root) => var tmp_0 :- get_latest_attesting_balance(store, root); Result((tmp_0, root)));
+      fixpoint(head_1);
+  loop_f(head_2, loop_body)
 }
 
 /*
@@ -216,65 +209,62 @@ function method validate_on_attestation(store: Store_dt, attestation: Attestatio
   Result(())
 }
 
-method store_target_checkpoint_state(store_: Store_dt, target: Checkpoint)
-returns (status_: Outcome<()>, store: Store_dt) 
+function method store_target_checkpoint_state(store: Store_dt, target: Checkpoint): Outcome<Store_dt>
 {
-  var unused_: ();
-  status_, store := Result(()), store_;
-  if target !in store.checkpoint_states {
+  if target !in store.checkpoint_states then
     var tmp_0 :- map_get(store.block_states, target.root);
     var base_state: BeaconState := tmp_0.copy();
-    if base_state.slot < compute_start_slot_at_epoch(target.epoch) {
-      unused_, base_state :- process_slots(base_state, compute_start_slot_at_epoch(target.epoch));
-    }
-    store := store.(checkpoint_states := store.checkpoint_states[target := base_state]);
-  }
+    var base_state :-
+      if base_state.slot < compute_start_slot_at_epoch(target.epoch) then
+        process_slots(base_state, compute_start_slot_at_epoch(target.epoch))
+      else
+        Result(base_state);
+    var store := store.(checkpoint_states := store.checkpoint_states[target := base_state]);
+    Result(store)
+  else
+    Result(store)
 }
 
-method update_latest_messages(store_: Store_dt, attesting_indices: seq<ValidatorIndex>, attestation: Attestation)
-returns (store: Store_dt)
+function method update_latest_messages(store: Store_dt, attesting_indices: seq<ValidatorIndex>, attestation: Attestation): Outcome<Store_dt>
 {
-  store := store_;
   var target: Checkpoint := attestation.data.target;
   var beacon_block_root: Root := attestation.data.beacon_block_root;
   var non_equivocating_attesting_indices: seq<ValidatorIndex> := seq_filter((i) => i !in store.equivocating_indices, attesting_indices);
-  var tmp_for_0: seq<ValidatorIndex> := non_equivocating_attesting_indices;
-  while tmp_for_0 != [] decreases tmp_for_0 {
-    var i: ValidatorIndex := tmp_for_0[0];
-    tmp_for_0 := tmp_for_0[1..];
-    if i !in store.latest_messages || target.epoch > store.latest_messages[i].epoch {
-      store := store.(latest_messages := store.latest_messages[i := LatestMessage(target.epoch, beacon_block_root)]);
-    }
-  }
+  var loop_body := (store: Store_dt, i: ValidatorIndex) =>
+    if i !in store.latest_messages || target.epoch > store.latest_messages[i].epoch then
+      store.(latest_messages := store.latest_messages[i := LatestMessage(target.epoch, beacon_block_root)])
+    else
+      store;
+  var store := seq_loop(non_equivocating_attesting_indices, store, loop_body);
+  Result(store)
 }
 
-method on_tick(store_: Store_dt, time: uint64)
-returns (status_: Outcome<()>, store: Store_dt) 
+function method on_tick(store: Store_dt, time: uint64): Outcome<Store_dt>
 {
-  status_, store := Result(()), store_;
   var previous_slot: Slot := get_current_slot(store);
-  store := store.(time := time);
+  var store := store.(time := time);
   var current_slot: Slot := get_current_slot(store);
-  if current_slot > previous_slot {
-    store := store.(proposer_boost_root := Root_new(0));
-  }
-  if !(current_slot > previous_slot && compute_slots_since_epoch_start(current_slot) == 0) {
-    return;
-  }
-  if store.best_justified_checkpoint.epoch > store.justified_checkpoint.epoch {
+  if current_slot > previous_slot then
+    var store := store.(proposer_boost_root := Root_new(0));
+    Result(store)
+  else
+  if !(current_slot > previous_slot && compute_slots_since_epoch_start(current_slot) == 0) then
+    Result(store)
+  else
+  if store.best_justified_checkpoint.epoch > store.justified_checkpoint.epoch then
     var finalized_slot: Slot := compute_start_slot_at_epoch(store.finalized_checkpoint.epoch);
     var ancestor_at_finalized_slot: Root :- get_ancestor(store, store.best_justified_checkpoint.root, finalized_slot);
-    if ancestor_at_finalized_slot == store.finalized_checkpoint.root {
-      store := store.(justified_checkpoint := store.best_justified_checkpoint);
-    }
-  }
+    if ancestor_at_finalized_slot == store.finalized_checkpoint.root then
+      var store := store.(justified_checkpoint := store.best_justified_checkpoint);
+      Result(store)
+    else
+      Result(store)
+  else
+    Result(store)
 }
 
-method on_block(store_: Store_dt, signed_block: SignedBeaconBlock)
-returns (status_: Outcome<()>, store: Store_dt) 
+function method on_block(store: Store_dt, signed_block: SignedBeaconBlock): Outcome<Store_dt>
 {
-  var unused_: ();
-  status_, store := Result(()), store_;
   var block: BeaconBlock := signed_block.message;
   var _ :- pyassert(block.parent_root in store.block_states);
   var tmp_0 :- map_get(store.block_states, block.parent_root);
@@ -285,27 +275,39 @@ returns (status_: Outcome<()>, store: Store_dt)
   var tmp_1 :- get_ancestor(store, block.parent_root, finalized_slot);
   var _ :- pyassert(tmp_1 == store.finalized_checkpoint.root);
   var state: BeaconState := pre_state.copy();
-  unused_, state :- state_transition(state, signed_block, true);
-  store := store.(blocks := store.blocks[hash_tree_root(block) := block]);
-  store := store.(block_states := store.block_states[hash_tree_root(block) := state]);
+  var state :- state_transition(state, signed_block, true);
+  var store := store.(blocks := store.blocks[hash_tree_root(block) := block]);
+  var store := store.(block_states := store.block_states[hash_tree_root(block) := state]);
   var time_into_slot: uint64 := (store.time - store.genesis_time) % SECONDS_PER_SLOT;
   var is_before_attesting_interval: bool := time_into_slot < (SECONDS_PER_SLOT / INTERVALS_PER_SLOT);
-  if get_current_slot(store) == block.slot && is_before_attesting_interval {
-    store := store.(proposer_boost_root := Root_new(hash_tree_root(block)));
-  }
-  if state.current_justified_checkpoint.epoch > store.justified_checkpoint.epoch {
-    if state.current_justified_checkpoint.epoch > store.best_justified_checkpoint.epoch {
-      store := store.(best_justified_checkpoint := state.current_justified_checkpoint);
-    }
-    var tmp_2 :- should_update_justified_checkpoint(store, state.current_justified_checkpoint);
-    if tmp_2 {
-      store := store.(justified_checkpoint := state.current_justified_checkpoint);
-    }
-  }
-  if state.finalized_checkpoint.epoch > store.finalized_checkpoint.epoch {
-    store := store.(finalized_checkpoint := state.finalized_checkpoint);
-    store := store.(justified_checkpoint := state.current_justified_checkpoint);
-  }
+  var store :=
+    if get_current_slot(store) == block.slot && is_before_attesting_interval then
+      store.(proposer_boost_root := Root_new(hash_tree_root(block)))
+    else
+      store;
+  var store :-
+    if state.current_justified_checkpoint.epoch > store.justified_checkpoint.epoch then
+      var store :=
+        if state.current_justified_checkpoint.epoch > store.best_justified_checkpoint.epoch then
+          store.(best_justified_checkpoint := state.current_justified_checkpoint)
+        else
+          store;
+      var tmp_2 :- should_update_justified_checkpoint(store, state.current_justified_checkpoint);
+      var store :=
+        if tmp_2 then
+          store.(justified_checkpoint := state.current_justified_checkpoint)
+        else
+          store;
+      Result(store)
+    else
+      Result(store);
+  var store :=
+    if state.finalized_checkpoint.epoch > store.finalized_checkpoint.epoch then
+      var store := store.(finalized_checkpoint := state.finalized_checkpoint);
+      store.(justified_checkpoint := state.current_justified_checkpoint)
+    else
+      store;
+  Result(store)
 }
 
 /*
@@ -314,27 +316,23 @@ returns (status_: Outcome<()>, store: Store_dt)
     An ``attestation`` that is asserted as invalid may be valid at a later time,
     consider scheduling it for later processing in such case.
     */
-method on_attestation(store_: Store_dt, attestation: Attestation, is_from_block: bool)
-returns (status_: Outcome<()>, store: Store_dt) 
+function method on_attestation(store: Store_dt, attestation: Attestation, is_from_block: bool): Outcome<Store_dt>
 {
-  var unused_: ();
-  status_, store := Result(()), store_;
   var _ :- validate_on_attestation(store, attestation, is_from_block);
-  unused_, store :- store_target_checkpoint_state(store, attestation.data.target);
+  var store :- store_target_checkpoint_state(store, attestation.data.target);
   var target_state: BeaconState :- map_get(store.checkpoint_states, attestation.data.target);
   var indexed_attestation: IndexedAttestation := get_indexed_attestation(target_state, attestation);
   var _ :- pyassert(is_valid_indexed_attestation(target_state, indexed_attestation));
-  store := update_latest_messages(store, indexed_attestation.attesting_indices, attestation);
+  var store :- update_latest_messages(store, indexed_attestation.attesting_indices, attestation);
+  Result(store)
 }
 
 /*
     Run ``on_attester_slashing`` immediately upon receiving a new ``AttesterSlashing``
     from either within a block or directly on the wire.
     */
-method on_attester_slashing(store_: Store_dt, attester_slashing: AttesterSlashing)
-returns (status_: Outcome<()>, store: Store_dt) 
+function method on_attester_slashing(store: Store_dt, attester_slashing: AttesterSlashing): Outcome<Store_dt>
 {
-  status_, store := Result(()), store_;
   var attestation_1: IndexedAttestation := attester_slashing.attestation_1;
   var attestation_2: IndexedAttestation := attester_slashing.attestation_2;
   var _ :- pyassert(is_slashable_attestation_data(attestation_1.data, attestation_2.data));
@@ -342,10 +340,7 @@ returns (status_: Outcome<()>, store: Store_dt)
   var _ :- pyassert(is_valid_indexed_attestation(state, attestation_1));
   var _ :- pyassert(is_valid_indexed_attestation(state, attestation_2));
   var indices: set<ValidatorIndex> := seq_to_set(attestation_1.attesting_indices) * seq_to_set(attestation_2.attesting_indices);
-  var tmp_for_0: set<ValidatorIndex> := indices;
-  while tmp_for_0 != {} decreases tmp_for_0 {
-    var index: ValidatorIndex :| index in tmp_for_0;
-    tmp_for_0 := tmp_for_0 - {index};
-    store := store.(equivocating_indices := store.equivocating_indices + {index});
-  }
+  var loop_body := (store: Store_dt, index: ValidatorIndex) =>
+    store.(equivocating_indices := store.equivocating_indices + {index});
+  Result(set_loop(indices, store, loop_body))
 }

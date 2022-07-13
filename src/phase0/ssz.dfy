@@ -15,14 +15,6 @@ module SSZ {
         ret_ :- r.0, r.1;
     }*/
 
-    function method b_<T>(r: Outcome<T>): NEOutcome
-    {
-        if r.IsFailure() then
-            NEException
-        else
-            NEResult(r.Extract())
-    }
-
     datatype Outcome<T> =
     | Result(value: T)
     | Exception
@@ -37,18 +29,6 @@ module SSZ {
             requires IsFailure()
         {
             Exception
-        }
-    }
-
-    datatype NEOutcome<T> =
-    | NEResult(value: T)
-    | NEException
-    {
-        predicate method IsFailure() { this.NEException?  }
-        function method PropagateFailure<U>(): NEOutcome<U>
-            requires IsFailure()
-        {
-            NEException
         }
     }
 
@@ -153,12 +133,6 @@ module SSZ {
 
     function method len<T>(a: Collection<T>): nat
 
-    function method pyassert_(b: bool): NEOutcome<()>
-    ensures b <==> !pyassert(b).IsFailure()
-    {
-      if b then NEResult(()) else NEException
-    }
-
     function method pyassert(b: bool): Outcome<()>
     ensures b <==> !pyassert(b).IsFailure()
     {
@@ -209,7 +183,13 @@ module SSZ {
     function method seq_to_set<T>(s: seq<T>): set<T>
 
     function method set_filter<T>(f: (T) -> bool, coll: set<T>): set<T>
+    function method set_filter_f<T>(f: (T) -> Outcome<bool>, coll: set<T>): Outcome<set<T>>
     function method set_to_seq<T>(s: set<T>): seq<T>
 
     function method map_get<K,V>(s: map<K,V>, k: K): Outcome<V>
+
+    function method loop_f<A>(init: A, body_fun: (A, (A) -> Outcome<A>) -> Outcome<A>): Outcome<A>
+    function method seq_loop<E,S>(coll: seq<E>, init: S, f: (S,E) -> S): S
+    function method seq_loop_f<E,S>(coll: seq<E>, init: S, f: (S,E) -> Outcome<S>): Outcome<S>
+    function method set_loop<E,S>(coll: set<E>, init: S, f: (S,E) -> S): S
 }
