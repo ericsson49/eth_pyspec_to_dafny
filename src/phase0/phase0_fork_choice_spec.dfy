@@ -225,7 +225,7 @@ function method store_target_checkpoint_state(store: Store_dt, target: Checkpoin
     Result(store)
 }
 
-function method update_latest_messages(store: Store_dt, attesting_indices: seq<ValidatorIndex>, attestation: Attestation): Outcome<Store_dt>
+function method update_latest_messages(store: Store_dt, attesting_indices: seq<ValidatorIndex>, attestation: Attestation): Store_dt
 {
   var target: Checkpoint := attestation.data.target;
   var beacon_block_root: Root := attestation.data.beacon_block_root;
@@ -236,7 +236,7 @@ function method update_latest_messages(store: Store_dt, attesting_indices: seq<V
     else
       store;
   var store := seq_loop(non_equivocating_attesting_indices, store, loop_body);
-  Result(store)
+  store
 }
 
 function method on_tick(store: Store_dt, time: uint64): Outcome<Store_dt>
@@ -323,7 +323,7 @@ function method on_attestation(store: Store_dt, attestation: Attestation, is_fro
   var target_state: BeaconState :- map_get(store.checkpoint_states, attestation.data.target);
   var indexed_attestation: IndexedAttestation := get_indexed_attestation(target_state, attestation);
   var _ :- pyassert(is_valid_indexed_attestation(target_state, indexed_attestation));
-  var store :- update_latest_messages(store, indexed_attestation.attesting_indices, attestation);
+  var store := update_latest_messages(store, indexed_attestation.attesting_indices, attestation);
   Result(store)
 }
 
