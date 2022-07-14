@@ -234,6 +234,11 @@ module SSZ {
     function method set_to_seq<T>(s: set<T>): seq<T>
 
     function method map_get<K,V>(s: map<K,V>, k: K): Outcome<V>
+    ensures k in s <==> !map_get(s, k).IsFailure()
+    ensures k in s ==> map_get(s, k).Extract() == s[k]
+    {
+        if k in s then Result(s[k]) else Exception
+    }
 
     function method loop_f<A>(init: A, body_fun: (A, (A) -> Outcome<A>) -> Outcome<A>): Outcome<A>
     function method seq_loop<E,S>(coll: seq<E>, init: S, f: (S,E) -> S): S
