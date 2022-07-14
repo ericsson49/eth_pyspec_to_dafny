@@ -16,9 +16,9 @@ function method is_valid_indexed_attestation(state: BeaconState, attestation: In
 function method get_indexed_attestation(state: BeaconState, attestation: Attestation): IndexedAttestation
 function method get_active_validator_indices(state: BeaconState, epoch: Epoch): seq<ValidatorIndex>
 function method get_total_active_balance(state: BeaconState): Gwei
-method process_slots(state: BeaconState, slot: Slot) returns (status_: Outcome<()>)
+method process_slots(state: BeaconState, slot: Slot) returns (status_: Outcome<BeaconState>)
 method state_transition(state: BeaconState, block: SignedBeaconBlock, check: bool)
-returns (status_: Outcome<()>)
+returns (status_: Outcome<BeaconState>)
 
 /*
     Return the epoch number at ``slot``.
@@ -354,7 +354,7 @@ modifies store.checkpoint_states
     var tmp_0 :- store.block_states.get(target.root);
     var base_state: BeaconState := tmp_0.copy();
     if base_state.slot < compute_start_slot_at_epoch(target.epoch) {
-      var _ :- process_slots(base_state, compute_start_slot_at_epoch(target.epoch));
+      base_state :- process_slots(base_state, compute_start_slot_at_epoch(target.epoch));
     }
     store.checkpoint_states.set_value(target, base_state);
   }
@@ -421,7 +421,7 @@ modifies store, store.blocks, store.block_states
   var tmp_1 :- get_ancestor(store, block.parent_root, finalized_slot);
   var _ :- pyassert(tmp_1 == store.finalized_checkpoint.root);
   var state: BeaconState := pre_state.copy();
-  var _ :- state_transition(state, signed_block, true);
+  state :- state_transition(state, signed_block, true);
   store.blocks.set_value(hash_tree_root(block), block);
   assume valid_blocks(store.blocks);
   store.block_states.set_value(hash_tree_root(block), state);
