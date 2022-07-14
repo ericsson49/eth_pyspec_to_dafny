@@ -349,6 +349,7 @@ method store_target_checkpoint_state(store: Store, target: Checkpoint)
 returns (status_: Outcome<()>) 
 modifies store.checkpoint_states
 {
+  status_ := Result(());
   if !store.checkpoint_states.contains(target) {
     var tmp_0 :- store.block_states.get(target.root);
     var base_state: BeaconState := tmp_0.copy();
@@ -383,6 +384,7 @@ requires valid_time_slots(store)
 requires valid_blocks(store.blocks)
 modifies store
 {
+  status_ := Result(());
   var previous_slot: Slot := get_current_slot(store);
   store.time := time;
   var current_slot: Slot := get_current_slot(store);
@@ -408,6 +410,7 @@ requires valid_time_slots(store)
 requires valid_blocks(store.blocks)
 modifies store, store.blocks, store.block_states
 {
+  status_ := Result(());
   var block: BeaconBlock := signed_block.message;
   var _ :- pyassert(store.block_states.contains(block.parent_root));
   var tmp_0 :- store.block_states.get(block.parent_root);
@@ -455,6 +458,7 @@ requires valid_time_slots(store)
 requires valid_blocks(store.blocks)
 modifies store.latest_messages, store.checkpoint_states
 {
+  status_ := Result(());
   var _ :- validate_on_attestation(store, attestation, is_from_block);
   var _ :- store_target_checkpoint_state(store, attestation.data.target);
   var target_state: BeaconState :- store.checkpoint_states.get(attestation.data.target);
@@ -471,6 +475,7 @@ method on_attester_slashing(store: Store, attester_slashing: AttesterSlashing)
 returns (status_: Outcome<()>) 
 modifies store.equivocating_indices
 {
+  status_ := Result(());
   var attestation_1: IndexedAttestation := attester_slashing.attestation_1;
   var attestation_2: IndexedAttestation := attester_slashing.attestation_2;
   var _ :- pyassert(is_slashable_attestation_data(attestation_1.data, attestation_2.data));
