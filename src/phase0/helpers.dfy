@@ -18,9 +18,11 @@ predicate valid_time_slots(store: Store)
   reads store
 {
   store.time >= store.genesis_time
+} by method {
+  return valid_time_slots_pure(store.toPure());
 }
 
-predicate valid_time_pure(store: Store_dt) {
+predicate method valid_time_slots_pure(store: Store_dt) {
   store.time >= store.genesis_time
 }
 
