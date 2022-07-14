@@ -72,8 +72,9 @@ module SSZ {
         function method contains(k: T): bool reads this
     }
     trait Sequence<T> extends Collection<T> {
+        function method size(): nat reads this
         function method get(k: nat): Outcome<T>
-        function method get_nf(i: nat): T
+        function method get_nf(i: nat): T reads this requires i < size()
     }
     class Dict<K(==),V> {
         var repr: map<K,V>;
@@ -117,20 +118,34 @@ module SSZ {
         var repr: seq<T>
         constructor empty() {}
         constructor(t: seq<T>) {}
-        function method contains(k: T): bool reads this
+        function method size(): nat reads this {
+            |repr|
+        }
+        function method contains(k: T): bool reads this ensures contains(k) <==> k in repr
         function method get(k: nat): Outcome<T>
-        function method get_nf(i: nat): T
+        function method get_nf(i: nat): T reads this requires i < size()
         method append(e: T) modifies this
     }
     class ssz_List<T> extends Sequence<T> {
+        var repr: seq<T>
+        function method size(): nat reads this {
+            |repr|
+        }
         function method contains(k: T): bool reads this
         function method get(k: nat): Outcome<T>
-        function method get_nf(i: nat): T
+        ensures !get(k).IsFailure() <==> k < size()
+        ensures !get(k).IsFailure() ==> get(k).Extract() == repr[k]
+        function method get_nf(i: nat): T reads this
+        requires i < |repr|
+        {
+            repr[i]
+        }
     }
     class ssz_Vector<T> extends Sequence<T> {
+        function method size(): nat reads this
         function method contains(k: T): bool reads this
         function method get(k: nat): Outcome<T>
-        function method get_nf(i: nat): T
+        function method get_nf(i: nat): T reads this requires i < size()
     }
     type Bitlist = ssz_List<boolean>
     type Bitvector = ssz_Vector<boolean>
@@ -186,10 +201,10 @@ module SSZ {
     function method any<T>(s: Sequence<T>): bool
     function method all<T>(s: Sequence<T>): bool
 
-    function method filter<T>(f: (T) -> bool, s: Collection<T>): Sequence<T>
-    function method filter_f<T>(f: (T) -> Outcome<bool>, s: Collection<T>): Outcome<Sequence<T>>
-    function method pymap<A,B>(f: (A) -> B, s: Collection<A>): Sequence<B>
-    function method pymap_f<A,B>(f: (A) -> Outcome<B>, s: Collection<A>): Outcome<Sequence<B>>
+    function method filter<T>(f: (T) ~> bool, s: Collection<T>): Sequence<T>
+    function method filter_f<T>(f: (T) ~> Outcome<bool>, s: Collection<T>): Outcome<Sequence<T>>
+    function method pymap<A,B>(f: (A) ~> B, s: Collection<A>): Sequence<B>
+    function method pymap_f<A,B>(f: (A) ~> Outcome<B>, s: Collection<A>): Outcome<Sequence<B>>
     function method max_f<A,B>(a: Collection<A>, key: (A) ~> Outcome<B>): Outcome<A>
     function method sum(a: Collection<nat>): nat
 
