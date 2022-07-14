@@ -85,7 +85,7 @@ requires valid_constants()
   return slot - compute_start_slot_at_epoch(compute_epoch_at_slot(slot));
 }
 
-function method get_ancestor(store: Store, root: Root, slot: Slot): Outcome<Root>
+function get_ancestor(store: Store, root: Root, slot: Slot): Outcome<Root>
 reads store, store.blocks
 requires valid_blocks(store.blocks)
 decreases if !store.blocks.contains(root) then 0 else store.blocks.get_nf(root).slot
@@ -98,6 +98,17 @@ decreases if !store.blocks.contains(root) then 0 else store.blocks.get_nf(root).
       Result(root)
     else
       Result(root)
+} by method {
+  var block: BeaconBlock :- store.blocks.get(root);
+  if block.slot > slot {
+    return get_ancestor(store, block.parent_root, slot);
+  } else {
+    if block.slot == slot {
+      return Result(root);
+    } else {
+      return Result(root);
+    }
+  }
 }
 
 function get_latest_attesting_balance(store: Store, root: Root): Outcome<Gwei>
