@@ -167,7 +167,6 @@ module SSZ {
     }
 
     function method len<T>(a: Collection<T>): nat
-    function method seq_get<T>(a: Sequence<T>, i: nat): T
 
     function method pyassert_(b: bool): NEOutcome<()>
     ensures b <==> !pyassert(b).IsFailure()
@@ -205,7 +204,8 @@ module SSZ {
     function method filter_f<T>(f: (T) ~> Outcome<bool>, s: Collection<T>): Outcome<Sequence<T>>
     function method pymap<A,B>(f: (A) ~> B, s: Collection<A>): Sequence<B>
     function method pymap_f<A,B>(f: (A) ~> Outcome<B>, s: Collection<A>): Outcome<Sequence<B>>
-    function method max_f<A,B>(a: Collection<A>, key: (A) ~> Outcome<B>): Outcome<A>
+    function method max_f<A,B>(a: Collection<A>, key: (A) -> Outcome<B>): Outcome<A>
+    function method max_hf<A,B>(a: Collection<A>, key: (A) ~> Outcome<B>): Outcome<A>
     function method sum(a: Collection<nat>): nat
 
     function method pow(a: nat, b: nat): nat
@@ -214,4 +214,29 @@ module SSZ {
     function method Bytes32_new(a: nat): Bytes1
     const Bytes32_default := Bytes32_new(0);
     const boolean_default := 0;
+
+    
+    function method seq_get<T>(s: seq<T>, i: nat): Outcome<T>    
+    function method seq_max_f<A,B>(cool: seq<A>, key: (A) -> Outcome<B>): Outcome<A>
+    function method seq_any<T>(coll: seq<T>): bool
+    function method seq_filter<T>(f: (T) -> bool, coll: seq<T>): seq<T>
+    function method seq_filter_f<T>(f: (T) -> Outcome<bool>, s: seq<T>): Outcome<seq<T>>
+    function method seq_filter_h<T>(f: (T) ~> bool, coll: seq<T>): seq<T>
+    function method seq_filter_hf<T>(f: (T) ~> Outcome<bool>, s: seq<T>): Outcome<seq<T>>
+    function method seq_map_f<A,B>(f: (A) -> Outcome<B>, s: seq<A>): Outcome<seq<B>>
+    function method seq_sum(a: seq<nat>): nat
+    function method seq_to_set<T>(s: seq<T>): set<T>
+
+    function method set_filter<T>(f: (T) -> bool, coll: set<T>): set<T>
+    function method set_filter_f<T>(f: (T) -> Outcome<bool>, coll: set<T>): Outcome<set<T>>
+    function method set_filter_h<T>(f: (T) ~> bool, coll: set<T>): set<T>
+    function method set_filter_hf<T>(f: (T) ~> Outcome<bool>, coll: set<T>): Outcome<set<T>>
+    function method set_to_seq<T>(s: set<T>): seq<T>
+
+    function method map_get<K,V>(s: map<K,V>, k: K): Outcome<V>
+
+    function method loop_f<A>(init: A, body_fun: (A, (A) -> Outcome<A>) -> Outcome<A>): Outcome<A>
+    function method seq_loop<E,S>(coll: seq<E>, init: S, f: (S,E) -> S): S
+    function method seq_loop_f<E,S>(coll: seq<E>, init: S, f: (S,E) -> Outcome<S>): Outcome<S>
+    function method set_loop<E,S>(coll: set<E>, init: S, f: (S,E) -> S): S
 }

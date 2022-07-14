@@ -1,7 +1,7 @@
 include "ssz.dfy"
 include "simpletypes.dfy"
 
-module Classes {
+module Entities {
     import opened SSZ
     import opened SimpleTypes
 
@@ -256,60 +256,6 @@ module Classes {
     }
     datatype LatestMessage = LatestMessage(epoch: Epoch, root: Root)
     function method LatestMessage_new(): LatestMessage
-    class Store {
-    constructor empty() {
-        time := 0;
-        genesis_time := 0;
-        justified_checkpoint := Checkpoint_new();
-        finalized_checkpoint := Checkpoint_new();
-        best_justified_checkpoint := Checkpoint_new();
-        proposer_boost_root := Root_default;
-        equivocating_indices := new Set.empty();
-        blocks := new Dict.empty();
-        block_states := new Dict.empty();
-        checkpoint_states := new Dict.empty();
-        latest_messages := new Dict.empty();
-    }
-    constructor Init(time: uint64, genesis_time: uint64, justified_checkpoint: Checkpoint, finalized_checkpoint: Checkpoint, best_justified_checkpoint: Checkpoint, proposer_boost_root: Root, equivocating_indices: Set<ValidatorIndex>, blocks: Dict<Root,BeaconBlock>, block_states: Dict<Root,BeaconState>, checkpoint_states: Dict<Checkpoint,BeaconState>, latest_messages: Dict<ValidatorIndex,LatestMessage>)
-    ensures this.time == time && this.genesis_time == genesis_time && this.justified_checkpoint == justified_checkpoint
-    && this.finalized_checkpoint == finalized_checkpoint && this.best_justified_checkpoint == best_justified_checkpoint
-    && this.proposer_boost_root == proposer_boost_root && this.equivocating_indices == equivocating_indices
-    && this.blocks == blocks && this.block_states == block_states && this.checkpoint_states == checkpoint_states
-    && this.latest_messages == latest_messages
-    {
-        this.time := time;
-        this.genesis_time := genesis_time;
-        this.justified_checkpoint := justified_checkpoint;
-        this.finalized_checkpoint := finalized_checkpoint;
-        this.best_justified_checkpoint := best_justified_checkpoint;
-        this.proposer_boost_root := proposer_boost_root;
-        this.equivocating_indices := equivocating_indices;
-        this.blocks := blocks;
-        this.block_states := block_states;
-        this.checkpoint_states := checkpoint_states;
-        this.latest_messages := latest_messages;
-    }
-    var time: uint64;
-    var genesis_time: uint64;
-    var justified_checkpoint: Checkpoint;
-    var finalized_checkpoint: Checkpoint;
-    var best_justified_checkpoint: Checkpoint;
-    var proposer_boost_root: Root;
-    var equivocating_indices: Set<ValidatorIndex>;
-    var blocks: Dict<Root,BeaconBlock>;
-    var block_states: Dict<Root,BeaconState>;
-    var checkpoint_states: Dict<Checkpoint,BeaconState>;
-    var latest_messages: Dict<ValidatorIndex,LatestMessage>;
-    function method toPure(): Store_dt
-    reads this, this.equivocating_indices, this.blocks, this.block_states, this.checkpoint_states, this.latest_messages
-    {
-        Store_dt(
-            time, genesis_time, justified_checkpoint, finalized_checkpoint,
-            best_justified_checkpoint, proposer_boost_root, equivocating_indices.repr,
-            blocks.repr, block_states.repr, checkpoint_states.repr, latest_messages.repr
-        )
-    }
-    }
     datatype Store_dt = Store_dt(
         time: uint64,
         genesis_time: uint64,
@@ -339,6 +285,61 @@ module Classes {
                 best_justified_checkpoint, proposer_boost_root, equivocating_indices,
                 blocks, block_states, checkpoint_states, latest_messages
             );
+        }
+    }
+
+    class Store {
+        constructor empty() {
+            time := 0;
+            genesis_time := 0;
+            justified_checkpoint := Checkpoint_new();
+            finalized_checkpoint := Checkpoint_new();
+            best_justified_checkpoint := Checkpoint_new();
+            proposer_boost_root := Root_default;
+            equivocating_indices := new Set.empty();
+            blocks := new Dict.empty();
+            block_states := new Dict.empty();
+            checkpoint_states := new Dict.empty();
+            latest_messages := new Dict.empty();
+        }
+        constructor Init(time: uint64, genesis_time: uint64, justified_checkpoint: Checkpoint, finalized_checkpoint: Checkpoint, best_justified_checkpoint: Checkpoint, proposer_boost_root: Root, equivocating_indices: Set<ValidatorIndex>, blocks: Dict<Root,BeaconBlock>, block_states: Dict<Root,BeaconState>, checkpoint_states: Dict<Checkpoint,BeaconState>, latest_messages: Dict<ValidatorIndex,LatestMessage>)
+        ensures this.time == time && this.genesis_time == genesis_time && this.justified_checkpoint == justified_checkpoint
+        && this.finalized_checkpoint == finalized_checkpoint && this.best_justified_checkpoint == best_justified_checkpoint
+        && this.proposer_boost_root == proposer_boost_root && this.equivocating_indices == equivocating_indices
+        && this.blocks == blocks && this.block_states == block_states && this.checkpoint_states == checkpoint_states
+        && this.latest_messages == latest_messages
+        {
+            this.time := time;
+            this.genesis_time := genesis_time;
+            this.justified_checkpoint := justified_checkpoint;
+            this.finalized_checkpoint := finalized_checkpoint;
+            this.best_justified_checkpoint := best_justified_checkpoint;
+            this.proposer_boost_root := proposer_boost_root;
+            this.equivocating_indices := equivocating_indices;
+            this.blocks := blocks;
+            this.block_states := block_states;
+            this.checkpoint_states := checkpoint_states;
+            this.latest_messages := latest_messages;
+        }
+        var time: uint64;
+        var genesis_time: uint64;
+        var justified_checkpoint: Checkpoint;
+        var finalized_checkpoint: Checkpoint;
+        var best_justified_checkpoint: Checkpoint;
+        var proposer_boost_root: Root;
+        var equivocating_indices: Set<ValidatorIndex>;
+        var blocks: Dict<Root,BeaconBlock>;
+        var block_states: Dict<Root,BeaconState>;
+        var checkpoint_states: Dict<Checkpoint,BeaconState>;
+        var latest_messages: Dict<ValidatorIndex,LatestMessage>;
+        function method toPure(): Store_dt
+        reads this, this.equivocating_indices, this.blocks, this.block_states, this.checkpoint_states, this.latest_messages
+        {
+            Store_dt(
+                time, genesis_time, justified_checkpoint, finalized_checkpoint,
+                best_justified_checkpoint, proposer_boost_root, equivocating_indices.repr,
+                blocks.repr, block_states.repr, checkpoint_states.repr, latest_messages.repr
+            )
         }
     }
 }

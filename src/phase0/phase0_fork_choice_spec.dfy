@@ -1,26 +1,24 @@
 include "ssz.dfy"
 include "simpletypes.dfy"
-include "classes.dfy"
+include "entities.dfy"
 include "consts.dfy"
 
 include "helpers.dfy"
 
 import opened SSZ
 import opened SimpleTypes
-import opened Classes
+import opened Entities
 import opened Consts
 
 function method get_current_epoch(state: BeaconState): Epoch
 function method is_slashable_attestation_data(data1: AttestationData, data2: AttestationData): bool
 function method is_valid_indexed_attestation(state: BeaconState, attestation: IndexedAttestation): bool
 function method get_indexed_attestation(state: BeaconState, attestation: Attestation): IndexedAttestation
-function method get_active_validator_indices(state: BeaconState, epoch: Epoch): Sequence<ValidatorIndex>
+function method get_active_validator_indices(state: BeaconState, epoch: Epoch): seq<ValidatorIndex>
 function method get_total_active_balance(state: BeaconState): Gwei
 method process_slots(state: BeaconState, slot: Slot) returns (status_: Outcome<()>)
-modifies state
 method state_transition(state: BeaconState, block: SignedBeaconBlock, check: bool)
 returns (status_: Outcome<()>)
-modifies state
 
 /*
     Return the epoch number at ``slot``.
@@ -88,7 +86,7 @@ requires valid_constants()
 }
 
 function method get_ancestor(store: Store, root: Root, slot: Slot): Outcome<Root>
-reads store, store.blocks, store.blocks.values()
+reads store, store.blocks
 requires valid_blocks(store.blocks)
 decreases if !store.blocks.contains(root) then 0 else store.blocks.get_nf(root).slot
 {
@@ -103,17 +101,14 @@ decreases if !store.blocks.contains(root) then 0 else store.blocks.get_nf(root).
 }
 
 function get_latest_attesting_balance(store: Store, root: Root): Outcome<Gwei>
-reads store, store.blocks, store.blocks.values()
-reads store.checkpoint_states, store.checkpoint_states.values()
-reads set s <- store.checkpoint_states.values() :: s.validators
-reads set s <- store.checkpoint_states.values(), v <- s.validators.repr :: v
+reads store, store.blocks, store.checkpoint_states
 requires valid_constants()
 requires valid_blocks(store.blocks)
 {
   var state: BeaconState :- store.checkpoint_states.get(store.justified_checkpoint);
-  var active_indices: Sequence<ValidatorIndex> := get_active_validator_indices(state, get_current_epoch(state));
-  var tmp_0 :- filter_f((i)
-     reads store, store.latest_messages, store.equivocating_indices, store.blocks, store.blocks.values()
+  var active_indices: seq<ValidatorIndex> := get_active_validator_indices(state, get_current_epoch(state));
+  var tmp_0 :- seq_filter_hf((i)
+     reads store, store.latest_messages, store.equivocating_indices, store.blocks
      requires valid_blocks(store.blocks)
    =>
       if store.latest_messages.contains(i) && !store.equivocating_indices.contains(i) then
@@ -123,8 +118,8 @@ requires valid_blocks(store.blocks)
         Result(tmp_2 == root)
       else Result(false),
     active_indices);
-  var tmp_1 :- pymap_f((i) reads state, state.validators, set v <- state.validators.repr :: v => var tmp_0 :- state.validators.get(i); Result(tmp_0.effective_balance), tmp_0);
-  var attestation_score: Gwei := Gwei_new(sum(tmp_1));
+  var tmp_1 :- seq_map_f((i) => var tmp_0 :- seq_get(state.validators, i); Result(tmp_0.effective_balance), tmp_0);
+  var attestation_score: Gwei := Gwei_new(seq_sum(tmp_1));
   if store.proposer_boost_root == Root_new(0) then
     Result(attestation_score)
   else
@@ -133,7 +128,7 @@ requires valid_blocks(store.blocks)
     var tmp_3 :- get_ancestor(store, store.proposer_boost_root, tmp_2.slot);
     var proposer_score_2: Gwei :-
       if tmp_3 == root then
-        var num_validators: int := len(get_active_validator_indices(state, get_current_epoch(state)));
+        var num_validators: int := |get_active_validator_indices(state, get_current_epoch(state))|;
         var _ :- if num_validators == 0 then Exception else Result(());
         var avg_balance: Gwei := get_total_active_balance(state) / num_validators;
         var committee_size: uint64 := num_validators / SLOTS_PER_EPOCH;
@@ -145,9 +140,9 @@ requires valid_blocks(store.blocks)
     Result(attestation_score + proposer_score_2)
 } by method {
   var state: BeaconState :- store.checkpoint_states.get(store.justified_checkpoint);
-  var active_indices: Sequence<ValidatorIndex> := get_active_validator_indices(state, get_current_epoch(state));
-  var tmp_0 :- filter_f((i)
-     reads store, store.latest_messages, store.equivocating_indices, store.blocks, store.blocks.values()
+  var active_indices: seq<ValidatorIndex> := get_active_validator_indices(state, get_current_epoch(state));
+  var tmp_0 :- seq_filter_hf((i)
+     reads store, store.latest_messages, store.equivocating_indices, store.blocks
      requires valid_blocks(store.blocks)
    =>
       if store.latest_messages.contains(i) && !store.equivocating_indices.contains(i) then
@@ -157,8 +152,8 @@ requires valid_blocks(store.blocks)
         Result(tmp_2 == root)
       else Result(false),
     active_indices);
-  var tmp_1 :- pymap_f((i) reads state, state.validators, set v <- state.validators.repr :: v => var tmp_0 :- state.validators.get(i); Result(tmp_0.effective_balance), tmp_0);
-  var attestation_score: Gwei := Gwei_new(sum(tmp_1));
+  var tmp_1 :- seq_map_f((i) => var tmp_0 :- seq_get(state.validators, i); Result(tmp_0.effective_balance), tmp_0);
+  var attestation_score: Gwei := Gwei_new(seq_sum(tmp_1));
   if store.proposer_boost_root == Root_new(0) {
     return Result(attestation_score);
   }
@@ -167,7 +162,7 @@ requires valid_blocks(store.blocks)
   var tmp_3 :- get_ancestor(store, store.proposer_boost_root, tmp_2.slot);
   var proposer_score_2: Gwei :-
     if tmp_3 == root then
-      var num_validators: int := len(get_active_validator_indices(state, get_current_epoch(state)));
+      var num_validators: int := |get_active_validator_indices(state, get_current_epoch(state))|;
       var _ :- if num_validators == 0 then Exception else Result(());
       var avg_balance: Gwei := get_total_active_balance(state) / num_validators;
       var committee_size: uint64 := num_validators / SLOTS_PER_EPOCH;
@@ -184,13 +179,15 @@ returns (status_: Outcome<bool>)
 modifies blocks
 {
   var block: BeaconBlock :- store.blocks.get(block_root);
-  var tmp_0 := Set_new(store.blocks.keys());
-  var children: PyList<Root> := pylist(filter((root) reads store, store.blocks, store.blocks.values() => store.blocks.get_nf(root).parent_root == block_root, tmp_0));
-  if any(children) {
-    var tmp_0 := iter(children);
+  var tmp_0 := store.blocks.keys();
+  var tmp_1 :- set_filter_hf((root) reads store, store.blocks => var tmp_0 :- store.blocks.get(root); Result(tmp_0.parent_root == block_root), tmp_0);
+  var children: seq<Root> := set_to_seq(tmp_1);
+  if seq_any(children) {
+    var tmp_0 := children;
     var tmp_1 := PyList_new([]);
-    while has_next(tmp_0) {
-      var child := next(tmp_0);
+    while tmp_0 != [] decreases tmp_0 {
+      var child := tmp_0[0];
+      tmp_0 := tmp_0[1..];
       var tmp_2 :- filter_block_tree(store, child, blocks);
       tmp_1.append(tmp_2);
     }
@@ -226,18 +223,24 @@ returns (status_: Outcome<Dict<Root,BeaconBlock>>)
 
 method get_head(store: Store)
 returns (status_: Outcome<Root>) 
+requires valid_constants()
+requires valid_blocks(store.blocks)
 {
   var blocks: Dict<Root,BeaconBlock> :- get_filtered_block_tree(store);
   var head: Root := store.justified_checkpoint.root;
   var head_2 := head;
   while true {
     var tmp_0 := Set_new(blocks.keys());
-    var tmp_1 :- filter_f((root) reads blocks, blocks.values() => var tmp_0 :- blocks.get(root); Result(tmp_0.parent_root == head_2), tmp_0);
+    var tmp_1 :- filter_f((root) reads blocks => var tmp_0 :- blocks.get(root); Result(tmp_0.parent_root == head_2), tmp_0);
     var children: PyList<Root> := pylist(tmp_1);
     if len(children) == 0 {
       return Result(head_2);
     }
-    var head_1: Root :- max_f(children, (root: Root) => var tmp_0 :- get_latest_attesting_balance(store, root); Result((tmp_0, root)));
+    var head_1: Root :- max_hf(children,
+      (root: Root)
+        reads store, store.blocks, store.checkpoint_states
+        requires valid_blocks(store.blocks)
+      => var tmp_0 :- get_latest_attesting_balance(store, root); Result((tmp_0, root)));
     head_2 := head_1;
   }
 }
@@ -250,7 +253,7 @@ returns (status_: Outcome<Root>)
     See https://ethresear.ch/t/prevention-of-bouncing-attack-on-ffg/6114 for more detailed analysis and discussion.
     */
 function should_update_justified_checkpoint(store: Store, new_justified_checkpoint: Checkpoint): Outcome<bool>
-reads store, store.blocks, store.blocks.values()
+reads store, store.blocks
 requires valid_time_slots(store) && valid_constants()
 requires valid_blocks(store.blocks)
 {
@@ -278,7 +281,6 @@ requires valid_blocks(store.blocks)
 
 function validate_target_epoch_against_current_time(store: Store, attestation: Attestation): Outcome<()>
 reads store
-reads attestation, attestation.data
 requires valid_constants()
 requires valid_time_slots(store)
 {
@@ -297,8 +299,7 @@ requires valid_time_slots(store)
 }
 
 function validate_on_attestation(store: Store, attestation: Attestation, is_from_block: bool): Outcome<()>
-reads store, store.blocks, store.blocks.values()
-reads attestation, attestation.data
+reads store, store.blocks
 requires valid_constants()
 requires valid_time_slots(store)
 requires valid_blocks(store.blocks)
@@ -347,15 +348,16 @@ modifies store.checkpoint_states
   }
 }
 
-method update_latest_messages(store: Store, attesting_indices: Sequence<ValidatorIndex>, attestation: Attestation)
+method update_latest_messages(store: Store, attesting_indices: seq<ValidatorIndex>, attestation: Attestation)
 modifies store.latest_messages
 {
   var target: Checkpoint := attestation.data.target;
   var beacon_block_root: Root := attestation.data.beacon_block_root;
-  var non_equivocating_attesting_indices: PyList<ValidatorIndex> := pylist(filter((i) reads store, store.equivocating_indices => !store.equivocating_indices.contains(i), attesting_indices));
-  var tmp_for_0: Iterator<ValidatorIndex> := iter(non_equivocating_attesting_indices);
-  while has_next(tmp_for_0) decreases tmp_for_0.decreases_ {
-    var i: ValidatorIndex := next(tmp_for_0);
+  var non_equivocating_attesting_indices: seq<ValidatorIndex> := seq_filter_h((i) reads store, store.equivocating_indices => !store.equivocating_indices.contains(i), attesting_indices);
+  var tmp_for_0: seq<ValidatorIndex> := non_equivocating_attesting_indices;
+  while tmp_for_0 != [] decreases tmp_for_0 {
+    var i: ValidatorIndex := tmp_for_0[0];
+    tmp_for_0 := tmp_for_0[1..];
     if !store.latest_messages.contains(i) || target.epoch > store.latest_messages.get_nf(i).epoch {
       store.latest_messages.set_value(i, LatestMessage(target.epoch, beacon_block_root));
     }
@@ -464,10 +466,11 @@ modifies store.equivocating_indices
   var state: BeaconState :- store.block_states.get(store.justified_checkpoint.root);
   var _ :- pyassert(is_valid_indexed_attestation(state, attestation_1));
   var _ :- pyassert(is_valid_indexed_attestation(state, attestation_2));
-  var indices: Set<ValidatorIndex> := pyset(attestation_1.attesting_indices).intersection(attestation_2.attesting_indices);
-  var tmp_for_0: Iterator<ValidatorIndex> := iter(indices);
-  while has_next(tmp_for_0) decreases tmp_for_0.decreases_ {
-    var index: ValidatorIndex := next(tmp_for_0);
+  var indices: set<ValidatorIndex> := seq_to_set(attestation_1.attesting_indices) * seq_to_set(attestation_2.attesting_indices);
+  var tmp_for_0: set<ValidatorIndex> := indices;
+  while tmp_for_0 != {} decreases tmp_for_0 {
+    var index: ValidatorIndex :| index in tmp_for_0;
+    tmp_for_0 := tmp_for_0 - {index};
     store.equivocating_indices.add(index);
   }
 }

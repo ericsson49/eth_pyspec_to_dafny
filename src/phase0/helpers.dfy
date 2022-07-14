@@ -1,11 +1,11 @@
 include "ssz.dfy"
 include "simpletypes.dfy"
-include "classes.dfy"
+include "entities.dfy"
 include "consts.dfy"
 
 import opened SSZ
 import opened SimpleTypes
-import opened Classes
+import opened Entities
 import opened Consts
 
 predicate valid_constants() {
@@ -25,13 +25,12 @@ predicate valid_time_pure(store: Store_dt) {
 }
 
 predicate valid_blocks(blocks: Dict<Root, BeaconBlock>)
-  reads blocks, blocks.values()
+  reads blocks
 {
   valid_blocks_pure(blocks.repr)
 }
 
 predicate valid_blocks_pure(blocks: map<Root, BeaconBlock>)
-  reads blocks.Values
 {
   forall r :: r in blocks.Keys ==>
     var b := blocks[r];
