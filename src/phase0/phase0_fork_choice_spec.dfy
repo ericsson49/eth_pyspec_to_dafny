@@ -21,6 +21,8 @@ ensures process_slots_pure(state, slot) == status_
 function method process_slots_pure(state: BeaconState, slot: Slot): Outcome<BeaconState>
 method state_transition(state: BeaconState, block: SignedBeaconBlock, check: bool)
 returns (status_: Outcome<BeaconState>)
+ensures state_transition_pure(state, block, check) == status_
+function method state_transition_pure(state: BeaconState, block: SignedBeaconBlock, check: bool): Outcome<BeaconState>
 
 /*
     Return the epoch number at ``slot``.
@@ -288,11 +290,12 @@ method get_head(store: Store)
 returns (status_: Outcome<Root>) 
 requires valid_constants()
 requires valid_blocks(store.blocks)
+decreases *
 {
   var blocks: Dict<Root,BeaconBlock> :- get_filtered_block_tree(store);
   var head: Root := store.justified_checkpoint.root;
   var head_2 := head;
-  while true {
+  while true decreases * {
     var tmp_0 := Set_new(blocks.keys());
     var tmp_1 :- filter_f((root) reads blocks => var tmp_0 :- blocks.get(root); Result(tmp_0.parent_root == head_2), tmp_0);
     var children: PyList<Root> := pylist(tmp_1);
@@ -319,7 +322,8 @@ function should_update_justified_checkpoint(store: Store, new_justified_checkpoi
 reads store, store.blocks
 requires valid_time_slots(store) && valid_constants()
 requires valid_blocks(store.blocks)
-ensures should_update_justified_checkpoint_pure(store.toPure(), new_justified_checkpoint) == should_update_justified_checkpoint(store, new_justified_checkpoint)
+ensures should_update_justified_checkpoint_pure(store.toPure(), new_justified_checkpoint)
+        == should_update_justified_checkpoint(store, new_justified_checkpoint)
 {
   if compute_slots_since_epoch_start(get_current_slot(store)) < SAFE_SLOTS_TO_UPDATE_JUSTIFIED then
     Result(true)
@@ -377,7 +381,8 @@ function validate_target_epoch_against_current_time(store: Store, attestation: A
 reads store
 requires valid_constants()
 requires valid_time_slots(store)
-ensures validate_target_epoch_against_current_time_pure(store.toPure(), attestation) == validate_target_epoch_against_current_time(store, attestation)
+ensures validate_target_epoch_against_current_time_pure(store.toPure(), attestation)
+        == validate_target_epoch_against_current_time(store, attestation)
 {
   var target: Checkpoint := attestation.data.target;
   var current_epoch: Epoch := compute_epoch_at_slot(get_current_slot(store));
@@ -418,7 +423,8 @@ reads store, store.blocks
 requires valid_constants()
 requires valid_time_slots(store)
 requires valid_blocks(store.blocks)
-ensures validate_on_attestation_pure(store.toPure(), attestation, is_from_block) == validate_on_attestation(store, attestation, is_from_block)
+ensures validate_on_attestation_pure(store.toPure(), attestation, is_from_block)
+        == validate_on_attestation(store, attestation, is_from_block)
 {
   var target: Checkpoint := attestation.data.target;
   var _ :- if !is_from_block then
@@ -535,18 +541,73 @@ function store_target_checkpoint_state_pure(store: Store_dt, target: Checkpoint)
 
 method update_latest_messages(store: Store, attesting_indices: seq<ValidatorIndex>, attestation: Attestation)
 modifies store.latest_messages
+ensures store.toPure() == update_latest_messages_pure(old(store.toPure()), attesting_indices, attestation)
 {
   var target: Checkpoint := attestation.data.target;
   var beacon_block_root: Root := attestation.data.beacon_block_root;
   var non_equivocating_attesting_indices: seq<ValidatorIndex> := seq_filter_h((i) reads store, store.equivocating_indices => !store.equivocating_indices.contains(i), attesting_indices);
+  var tmp := store.equivocating_indices.repr;
+  assume non_equivocating_attesting_indices == seq_filter((i) => i !in tmp, attesting_indices);
   var tmp_for_0: seq<ValidatorIndex> := non_equivocating_attesting_indices;
-  while tmp_for_0 != [] decreases tmp_for_0 {
+  
+  ghost var processed: seq<ValidatorIndex> := [];
+  ghost var loop_body := (store: Store_dt, i: ValidatorIndex) =>
+    if i !in store.latest_messages || target.epoch > store.latest_messages[i].epoch then
+      store.(latest_messages := store.latest_messages[i := LatestMessage(target.epoch, beacon_block_root)])
+    else
+      store;
+  while tmp_for_0 != [] decreases tmp_for_0
+  invariant processed + tmp_for_0 == non_equivocating_attesting_indices
+  invariant seq_loop(processed, old(store.toPure()), loop_body) == store.toPure()
+  {
     var i: ValidatorIndex := tmp_for_0[0];
     tmp_for_0 := tmp_for_0[1..];
     if !store.latest_messages.contains(i) || target.epoch > store.latest_messages.get_nf(i).epoch {
       store.latest_messages.set_value(i, LatestMessage(target.epoch, beacon_block_root));
     }
+    processed := processed + [i];
   }
+  assert processed == non_equivocating_attesting_indices;
+}
+
+function update_latest_messages_pure(store: Store_dt, attesting_indices: seq<ValidatorIndex>, attestation: Attestation): Store_dt
+{
+  var target: Checkpoint := attestation.data.target;
+  var beacon_block_root: Root := attestation.data.beacon_block_root;
+  var non_equivocating_attesting_indices: seq<ValidatorIndex> := seq_filter((i) => i !in store.equivocating_indices, attesting_indices);
+  var loop_body := (store: Store_dt, i: ValidatorIndex) =>
+    if i !in store.latest_messages || target.epoch > store.latest_messages[i].epoch then
+      store.(latest_messages := store.latest_messages[i := LatestMessage(target.epoch, beacon_block_root)])
+    else
+      store;
+  var store := seq_loop(non_equivocating_attesting_indices, store, loop_body);
+  store
+} by method {
+  var store := store;
+  var target: Checkpoint := attestation.data.target;
+  var beacon_block_root: Root := attestation.data.beacon_block_root;
+  var non_equivocating_attesting_indices: seq<ValidatorIndex> := seq_filter((i) => i !in store.equivocating_indices, attesting_indices);
+  var tmp_for_0: seq<ValidatorIndex> := non_equivocating_attesting_indices;
+  ghost var processed := [];
+  ghost var loop_body := (store: Store_dt, i: ValidatorIndex) =>
+    if i !in store.latest_messages || target.epoch > store.latest_messages[i].epoch then
+      store.(latest_messages := store.latest_messages[i := LatestMessage(target.epoch, beacon_block_root)])
+    else
+      store;
+  ghost var store_before_loop := store;
+  while tmp_for_0 != [] decreases tmp_for_0
+  invariant processed + tmp_for_0 == non_equivocating_attesting_indices
+  invariant seq_loop(processed, store_before_loop, loop_body) == store
+  {
+    var i: ValidatorIndex := tmp_for_0[0];
+    tmp_for_0 := tmp_for_0[1..];
+    if i !in store.latest_messages || target.epoch > store.latest_messages[i].epoch {
+      store := store.(latest_messages := store.latest_messages[i := LatestMessage(target.epoch, beacon_block_root)]);
+    }
+    processed := processed + [i];
+  }
+  assert processed == non_equivocating_attesting_indices;
+  return store;
 }
 
 method on_tick(store: Store, time: uint64)
@@ -571,7 +632,7 @@ ensures !status_.IsFailure() ==> store.toPure() == on_tick_pure(old(store.toPure
   }
   if store.best_justified_checkpoint.epoch > store.justified_checkpoint.epoch {
     var finalized_slot: Slot := compute_start_slot_at_epoch(store.finalized_checkpoint.epoch);
-    var ancestor_at_finalized_slot: Root :- get_ancestor(store, store.best_justified_checkpoint.root, finalized_slot);
+    var ancestor_at_finalized_slot :- get_ancestor(store, store.best_justified_checkpoint.root, finalized_slot);
     if ancestor_at_finalized_slot == store.finalized_checkpoint.root {
       store.justified_checkpoint := store.best_justified_checkpoint;
     }
@@ -587,10 +648,11 @@ requires valid_blocks_pure(store.blocks)
   var previous_slot: Slot := get_current_slot_pure(store);
   var store := store.(time := time);
   var current_slot: Slot := get_current_slot_pure(store);
-  if current_slot > previous_slot then
+  var store := if current_slot > previous_slot then
     var store := store.(proposer_boost_root := Root_new(0));
-    Result(store)
+    store
   else
+    store;
   if !(current_slot > previous_slot && compute_slots_since_epoch_start(current_slot) == 0) then
     Result(store)
   else
@@ -631,6 +693,8 @@ requires valid_constants()
 requires valid_time_slots(store)
 requires valid_blocks(store.blocks)
 modifies store, store.blocks, store.block_states
+ensures !status_.IsFailure() <==> !on_block_pure(old(store.toPure()), signed_block).IsFailure()
+ensures !status_.IsFailure() ==> store.toPure() == on_block_pure(old(store.toPure()), signed_block).Extract()
 {
   status_ := Result(());
   var block: BeaconBlock := signed_block.message;
@@ -667,6 +731,92 @@ modifies store, store.blocks, store.block_states
   }
 }
 
+function on_block_pure(store: Store_dt, signed_block: SignedBeaconBlock): Outcome<Store_dt>
+requires valid_constants()
+requires valid_time_slots_pure(store)
+requires valid_blocks_pure(store.blocks)
+{
+  var block: BeaconBlock := signed_block.message;
+  var _ :- pyassert(block.parent_root in store.block_states);
+  var tmp_0 :- map_get(store.block_states, block.parent_root);
+  var pre_state: BeaconState := tmp_0.copy();
+  var _ :- pyassert(get_current_slot_pure(store) >= block.slot);
+  var finalized_slot: Slot := compute_start_slot_at_epoch(store.finalized_checkpoint.epoch);
+  var _ :- pyassert(block.slot > finalized_slot);
+  var tmp_1 :- get_ancestor_pure(store, block.parent_root, finalized_slot);
+  var _ :- pyassert(tmp_1 == store.finalized_checkpoint.root);
+  var state: BeaconState := pre_state.copy();
+  var state :- state_transition_pure(state, signed_block, true);
+  var store := store.(blocks := store.blocks[hash_tree_root(block) := block]);
+  assume valid_blocks_pure(store.blocks);
+  var store := store.(block_states := store.block_states[hash_tree_root(block) := state]);
+  var time_into_slot: uint64 := (store.time - store.genesis_time) % SECONDS_PER_SLOT;
+  var is_before_attesting_interval: bool := time_into_slot < (SECONDS_PER_SLOT / INTERVALS_PER_SLOT);
+  var store :=
+    if get_current_slot_pure(store) == block.slot && is_before_attesting_interval then
+      store.(proposer_boost_root := Root_new(hash_tree_root(block)))
+    else
+      store;
+  var store :-
+    if state.current_justified_checkpoint.epoch > store.justified_checkpoint.epoch then
+      var store :=
+        if state.current_justified_checkpoint.epoch > store.best_justified_checkpoint.epoch then
+          store.(best_justified_checkpoint := state.current_justified_checkpoint)
+        else
+          store;
+      var tmp_2 :- should_update_justified_checkpoint_pure(store, state.current_justified_checkpoint);
+      var store :=
+        if tmp_2 then
+          store.(justified_checkpoint := state.current_justified_checkpoint)
+        else
+          store;
+      Result(store)
+    else
+      Result(store);
+  var store :=
+    if state.finalized_checkpoint.epoch > store.finalized_checkpoint.epoch then
+      var store := store.(finalized_checkpoint := state.finalized_checkpoint);
+      store.(justified_checkpoint := state.current_justified_checkpoint)
+    else
+      store;
+  Result(store)
+} by method {
+  var store := store;
+  var block: BeaconBlock := signed_block.message;
+  var _ :- pyassert(block.parent_root in store.block_states);
+  var tmp_0 :- map_get(store.block_states, block.parent_root);
+  var pre_state: BeaconState := tmp_0.copy();
+  var _ :- pyassert(get_current_slot_pure(store) >= block.slot);
+  var finalized_slot: Slot := compute_start_slot_at_epoch(store.finalized_checkpoint.epoch);
+  var _ :- pyassert(block.slot > finalized_slot);
+  var tmp_1 :- get_ancestor_pure(store, block.parent_root, finalized_slot);
+  var _ :- pyassert(tmp_1 == store.finalized_checkpoint.root);
+  var state: BeaconState := pre_state.copy();
+  state :- state_transition(state, signed_block, true);
+  store := store.(blocks := store.blocks[hash_tree_root(block) := block]);
+  assume valid_blocks_pure(store.blocks);
+  store := store.(block_states := store.block_states[hash_tree_root(block) := state]);
+  var time_into_slot: uint64 := (store.time - store.genesis_time) % SECONDS_PER_SLOT;
+  var is_before_attesting_interval: bool := time_into_slot < (SECONDS_PER_SLOT / INTERVALS_PER_SLOT);
+  if get_current_slot_pure(store) == block.slot && is_before_attesting_interval {
+    store := store.(proposer_boost_root := Root_new(hash_tree_root(block)));
+  }
+  if state.current_justified_checkpoint.epoch > store.justified_checkpoint.epoch {
+    if state.current_justified_checkpoint.epoch > store.best_justified_checkpoint.epoch {
+      store := store.(best_justified_checkpoint := state.current_justified_checkpoint);
+    }
+    var tmp_2 :- should_update_justified_checkpoint_pure(store, state.current_justified_checkpoint);
+    if tmp_2 {
+      store := store.(justified_checkpoint := state.current_justified_checkpoint);
+    }
+  }
+  if state.finalized_checkpoint.epoch > store.finalized_checkpoint.epoch {
+    store := store.(finalized_checkpoint := state.finalized_checkpoint);
+    store := store.(justified_checkpoint := state.current_justified_checkpoint);
+  }
+  return Result(store);
+}
+
 /*
     Run ``on_attestation`` upon receiving a new ``attestation`` from either within a block or directly on the wire.
 
@@ -679,6 +829,8 @@ requires valid_constants()
 requires valid_time_slots(store)
 requires valid_blocks(store.blocks)
 modifies store.latest_messages, store.checkpoint_states
+ensures !status_.IsFailure() <==> !on_attestation_pure(old(store.toPure()), attestation, is_from_block).IsFailure()
+ensures !status_.IsFailure() ==> store.toPure() == on_attestation_pure(old(store.toPure()), attestation, is_from_block).Extract()
 {
   status_ := Result(());
   var _ :- validate_on_attestation(store, attestation, is_from_block);
@@ -687,6 +839,37 @@ modifies store.latest_messages, store.checkpoint_states
   var indexed_attestation: IndexedAttestation := get_indexed_attestation(target_state, attestation);
   var _ :- pyassert(is_valid_indexed_attestation(target_state, indexed_attestation));
   update_latest_messages(store, indexed_attestation.attesting_indices, attestation);
+}
+
+function on_attestation_pure(store: Store_dt, attestation: Attestation, is_from_block: bool): Outcome<Store_dt>
+requires valid_constants()
+requires valid_time_slots_pure(store)
+requires valid_blocks_pure(store.blocks)
+{
+  var _ :- validate_on_attestation_pure(store, attestation, is_from_block);
+  var store :- store_target_checkpoint_state_pure(store, attestation.data.target);
+  var tmp := map_get(store.checkpoint_states, attestation.data.target);
+  if tmp.IsFailure() then
+    Exception
+  else
+  var target_state: BeaconState := tmp.Extract();
+  var indexed_attestation: IndexedAttestation := get_indexed_attestation(target_state, attestation);
+  var _ :- pyassert(is_valid_indexed_attestation(target_state, indexed_attestation));
+  var store := update_latest_messages_pure(store, indexed_attestation.attesting_indices, attestation);
+  Result(store)
+} by method {
+  var store := store;
+  var _ :- validate_on_attestation_pure(store, attestation, is_from_block);
+  store :- store_target_checkpoint_state_pure(store, attestation.data.target);
+  var tmp := map_get(store.checkpoint_states, attestation.data.target);
+  if tmp.IsFailure() {
+    return Exception;
+  }
+  var target_state: BeaconState := tmp.Extract();
+  var indexed_attestation: IndexedAttestation := get_indexed_attestation(target_state, attestation);
+  var _ :- pyassert(is_valid_indexed_attestation(target_state, indexed_attestation));
+  store := update_latest_messages_pure(store, indexed_attestation.attesting_indices, attestation);
+  return Result(store);
 }
 
 /*
@@ -711,4 +894,37 @@ modifies store.equivocating_indices
     tmp_for_0 := tmp_for_0 - {index};
     store.equivocating_indices.add(index);
   }
+}
+
+function method seq_intersection<T>(a: seq<T>, b: seq<T>): seq<T>
+
+function on_attester_slashing_pure(store: Store_dt, attester_slashing: AttesterSlashing): Outcome<Store_dt>
+{
+  var attestation_1: IndexedAttestation := attester_slashing.attestation_1;
+  var attestation_2: IndexedAttestation := attester_slashing.attestation_2;
+  var _ :- pyassert(is_slashable_attestation_data(attestation_1.data, attestation_2.data));
+  var state: BeaconState :- map_get(store.block_states, store.justified_checkpoint.root);
+  var _ :- pyassert(is_valid_indexed_attestation(state, attestation_1));
+  var _ :- pyassert(is_valid_indexed_attestation(state, attestation_2));
+  var indices: set<ValidatorIndex> := seq_to_set(attestation_1.attesting_indices) * seq_to_set(attestation_2.attesting_indices);
+  var loop_body := (store: Store_dt, index: ValidatorIndex) =>
+    store.(equivocating_indices := store.equivocating_indices + {index});
+  var store := set_loop(indices, store, loop_body);
+  Result(store)
+} by method {
+  var store := store;
+  var attestation_1: IndexedAttestation := attester_slashing.attestation_1;
+  var attestation_2: IndexedAttestation := attester_slashing.attestation_2;
+  var _ :- pyassert(is_slashable_attestation_data(attestation_1.data, attestation_2.data));
+  var state: BeaconState :- map_get(store.block_states, store.justified_checkpoint.root);
+  var _ :- pyassert(is_valid_indexed_attestation(state, attestation_1));
+  var _ :- pyassert(is_valid_indexed_attestation(state, attestation_2));
+  var indices: set<ValidatorIndex> := seq_to_set(attestation_1.attesting_indices) * seq_to_set(attestation_2.attesting_indices);
+  var tmp_for_0: set<ValidatorIndex> := indices;
+  while tmp_for_0 != {} decreases tmp_for_0 {
+    var index: ValidatorIndex :| index in tmp_for_0;
+    tmp_for_0 := tmp_for_0 - {index};
+    store := store.(equivocating_indices := store.equivocating_indices + {index});
+  }
+  return Result(store);
 }

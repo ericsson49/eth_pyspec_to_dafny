@@ -322,16 +322,16 @@ module Entities {
             this.latest_messages := latest_messages;
         }
         var time: uint64;
-        var genesis_time: uint64;
+        const genesis_time: uint64;
         var justified_checkpoint: Checkpoint;
         var finalized_checkpoint: Checkpoint;
         var best_justified_checkpoint: Checkpoint;
         var proposer_boost_root: Root;
-        var equivocating_indices: Set<ValidatorIndex>;
-        var blocks: Dict<Root,BeaconBlock>;
-        var block_states: Dict<Root,BeaconState>;
-        var checkpoint_states: Dict<Checkpoint,BeaconState>;
-        var latest_messages: Dict<ValidatorIndex,LatestMessage>;
+        const equivocating_indices: Set<ValidatorIndex>;
+        const blocks: Dict<Root,BeaconBlock>;
+        const block_states: Dict<Root,BeaconState>;
+        const checkpoint_states: Dict<Checkpoint,BeaconState>;
+        const latest_messages: Dict<ValidatorIndex,LatestMessage>;
         function method toPure(): Store_dt
         reads this, this.equivocating_indices, this.blocks, this.block_states, this.checkpoint_states, this.latest_messages
         {

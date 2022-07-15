@@ -241,7 +241,12 @@ module SSZ {
     }
 
     function method loop_f<A>(init: A, body_fun: (A, (A) -> Outcome<A>) -> Outcome<A>): Outcome<A>
-    function method seq_loop<E,S>(coll: seq<E>, init: S, f: (S,E) -> S): S
+    function method seq_loop<E,S>(coll: seq<E>, init: S, f: (S,E) -> S): S {
+    if |coll| == 0 then
+        init
+    else
+        f(seq_loop(coll[..(|coll|-1)], init, f), coll[|coll|-1])
+    }
     function method seq_loop_f<E,S>(coll: seq<E>, init: S, f: (S,E) -> Outcome<S>): Outcome<S>
     function method set_loop<E,S>(coll: set<E>, init: S, f: (S,E) -> S): S
 }
