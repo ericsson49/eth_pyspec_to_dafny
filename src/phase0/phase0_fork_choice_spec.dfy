@@ -101,19 +101,18 @@ requires valid_time_slots_pure(store)
 requires valid_blocks_pure(store.blocks)
 {
   var target: Checkpoint := attestation.data.target;
-  var _ :- if !is_from_block then
+  if !is_from_block then
     validate_target_epoch_against_current_time_pure(store, attestation)
   else
-    Result(());
-  var _ :- pyassert(target.epoch == compute_epoch_at_slot(attestation.data.slot));
-  var _ :- pyassert(target.root in store.blocks);
-  var _ :- pyassert(attestation.data.beacon_block_root in store.blocks);
-  var _ :- pyassert(store.blocks[attestation.data.beacon_block_root].slot <= attestation.data.slot);
-  var target_slot: Slot := compute_start_slot_at_epoch(target.epoch);
-  var tmp_0 :- get_ancestor_pure(store, attestation.data.beacon_block_root, target_slot);
-  var _ :- pyassert(target.root == tmp_0);
-  var _ :- pyassert(get_current_slot_pure(store) >= (attestation.data.slot + 1));
-  Result(())
+    var _ :- pyassert(target.epoch == compute_epoch_at_slot(attestation.data.slot));
+    var _ :- pyassert(target.root in store.blocks);
+    var _ :- pyassert(attestation.data.beacon_block_root in store.blocks);
+    var _ :- pyassert(store.blocks[attestation.data.beacon_block_root].slot <= attestation.data.slot);
+    var target_slot: Slot := compute_start_slot_at_epoch(target.epoch);
+    var tmp_0 :- get_ancestor_pure(store, attestation.data.beacon_block_root, target_slot);
+    var _ :- pyassert(target.root == tmp_0);
+    var _ :- pyassert(get_current_slot_pure(store) >= (attestation.data.slot + 1));
+    Result(())
 }
 
 function store_target_checkpoint_state_pure(store: Store_dt, target: Checkpoint): Outcome<Store_dt>
